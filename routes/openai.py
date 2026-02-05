@@ -523,11 +523,11 @@ IMPORTANT: If calling tools, output ONLY the JSON. The response must start with 
                                     think_list.append(content_text)
                                 else:
                                     text_list.append(content_text)
-                            except Exception as e:
-                                logger.warning(f"[collect_data] 无法解析: {chunk}, 错误: {e}")
-                                text_list.append("解析失败，请稍候再试")
-                                data_queue.put(None)
-                                break
+                        except Exception as e:
+                            logger.warning(f"[collect_data] 无法解析: {chunk}, 错误: {e}")
+                            text_list.append("解析失败，请稍候再试")
+                            data_queue.put(None)
+                            break
                 except Exception as e:
                     logger.warning(f"[collect_data] 错误: {e}")
                     text_list.append("处理失败，请稍候再试")
