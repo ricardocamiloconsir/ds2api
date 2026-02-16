@@ -64,8 +64,7 @@ pnpm-lock.yaml
 *.tsbuildinfo
 .cache/
 .parcel-cache/
-static/admin/*
-!static/admin/.gitkeep
+# static/admin build output is versioned for serverless deployments
 
 # Environment
 .env.local
