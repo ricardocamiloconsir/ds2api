@@ -152,3 +152,28 @@ func TestPoolAccountConcurrencyAliasEnv(t *testing.T) {
 		t.Fatalf("unexpected recommended_concurrency: %#v", status["recommended_concurrency"])
 	}
 }
+
+func TestPoolSupportsTokenOnlyAccount(t *testing.T) {
+	t.Setenv("DS2API_ACCOUNT_MAX_INFLIGHT", "1")
+	t.Setenv("DS2API_CONFIG_JSON", `{
+		"keys":["k1"],
+		"accounts":[{"token":"token-only-account"}]
+	}`)
+
+	pool := NewPool(config.LoadStore())
+	status := pool.Status()
+	if got, ok := status["total"].(int); !ok || got != 1 {
+		t.Fatalf("unexpected total in pool status: %#v", status["total"])
+	}
+	if got, ok := status["available"].(int); !ok || got != 1 {
+		t.Fatalf("unexpected available in pool status: %#v", status["available"])
+	}
+
+	acc, ok := pool.Acquire("", nil)
+	if !ok {
+		t.Fatalf("expected acquire success for token-only account")
+	}
+	if acc.Token != "token-only-account" {
+		t.Fatalf("unexpected token on acquired account: %q", acc.Token)
+	}
+}

@@ -226,6 +226,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 	hasContent := false
 	keepaliveTicker := time.NewTicker(time.Duration(deepseek.KeepAliveTimeout) * time.Second)
 	defer keepaliveTicker.Stop()
+	keepaliveCountWithoutContent := 0
 
 	sendChunk := func(v any) {
 		b, _ := json.Marshal(v)
@@ -301,6 +302,13 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 		case <-r.Context().Done():
 			return
 		case <-keepaliveTicker.C:
+			if !hasContent {
+				keepaliveCountWithoutContent++
+				if keepaliveCountWithoutContent >= deepseek.MaxKeepaliveCount {
+					finalize("stop")
+					return
+				}
+			}
 			if hasContent && time.Since(lastContent) > time.Duration(deepseek.StreamIdleTimeout)*time.Second {
 				finalize("stop")
 				return
@@ -343,6 +351,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 				}
 				hasContent = true
 				lastContent = time.Now()
+				keepaliveCountWithoutContent = 0
 				delta := map[string]any{}
 				if !firstChunkSent {
 					delta["role"] = "assistant"
