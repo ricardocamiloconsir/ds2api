@@ -88,6 +88,19 @@ flowchart LR
 
 ## 快速开始
 
+### 通用第一步（所有部署方式）
+
+把 `config.json` 作为唯一配置源（推荐做法）：
+
+```bash
+cp config.example.json config.json
+# 编辑 config.json
+```
+
+后续部署建议：
+- 本地运行：直接读取 `config.json`
+- Docker / Vercel：由 `config.json` 生成 `DS2API_CONFIG_JSON`（Base64）注入环境变量
+
 ### 方式一：本地运行
 
 **前置要求**：Go 1.24+，Node.js 20+（仅在需要构建 WebUI 时）
@@ -112,14 +125,20 @@ go run ./cmd/ds2api
 ### 方式二：Docker 运行
 
 ```bash
-# 1. 配置环境变量
+# 1. 准备环境变量文件
 cp .env.example .env
-# 编辑 .env
 
-# 2. 启动
+# 2. 从 config.json 生成 DS2API_CONFIG_JSON（单行 Base64）
+DS2API_CONFIG_JSON="$(base64 < config.json | tr -d '\n')"
+
+# 3. 编辑 .env，设置：
+#    DS2API_ADMIN_KEY=请替换为强密码
+#    DS2API_CONFIG_JSON=${DS2API_CONFIG_JSON}
+
+# 4. 启动
 docker-compose up -d
 
-# 3. 查看日志
+# 5. 查看日志
 docker-compose logs -f
 ```
 
@@ -129,8 +148,21 @@ docker-compose logs -f
 
 1. Fork 仓库到自己的 GitHub
 2. 在 Vercel 上导入项目
-3. 配置环境变量（至少设置 `DS2API_ADMIN_KEY` 和 `DS2API_CONFIG_JSON`）
+3. 配置环境变量（最少设置 `DS2API_ADMIN_KEY`；推荐同时设置 `DS2API_CONFIG_JSON`）
 4. 部署
+
+建议先在仓库目录复制模板并填写：
+
+```bash
+cp config.example.json config.json
+# 编辑 config.json
+```
+
+推荐：先本地把 `config.json` 转成 Base64，再粘贴到 `DS2API_CONFIG_JSON`，避免 JSON 格式错误：
+
+```bash
+base64 < config.json | tr -d '\n'
+```
 
 > **流式说明**：`/v1/chat/completions` 在 Vercel 上默认走 `api/chat-stream.js`（Node Runtime）以保证实时 SSE。鉴权、账号选择、会话/PoW 准备仍由 Go 内部 prepare 接口完成；流式响应（含 `tools`）在 Node 侧执行与 Go 对齐的输出组装与防泄漏处理。
 

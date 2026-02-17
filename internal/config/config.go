@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -101,17 +102,29 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 	for k, v := range raw {
 		switch k {
 		case "keys":
-			_ = json.Unmarshal(v, &c.Keys)
+			if err := json.Unmarshal(v, &c.Keys); err != nil {
+				return fmt.Errorf("invalid field %q: %w", k, err)
+			}
 		case "accounts":
-			_ = json.Unmarshal(v, &c.Accounts)
+			if err := json.Unmarshal(v, &c.Accounts); err != nil {
+				return fmt.Errorf("invalid field %q: %w", k, err)
+			}
 		case "claude_mapping":
-			_ = json.Unmarshal(v, &c.ClaudeMapping)
+			if err := json.Unmarshal(v, &c.ClaudeMapping); err != nil {
+				return fmt.Errorf("invalid field %q: %w", k, err)
+			}
 		case "claude_model_mapping":
-			_ = json.Unmarshal(v, &c.ClaudeModelMap)
+			if err := json.Unmarshal(v, &c.ClaudeModelMap); err != nil {
+				return fmt.Errorf("invalid field %q: %w", k, err)
+			}
 		case "_vercel_sync_hash":
-			_ = json.Unmarshal(v, &c.VercelSyncHash)
+			if err := json.Unmarshal(v, &c.VercelSyncHash); err != nil {
+				return fmt.Errorf("invalid field %q: %w", k, err)
+			}
 		case "_vercel_sync_time":
-			_ = json.Unmarshal(v, &c.VercelSyncTime)
+			if err := json.Unmarshal(v, &c.VercelSyncTime); err != nil {
+				return fmt.Errorf("invalid field %q: %w", k, err)
+			}
 		default:
 			var anyVal any
 			if err := json.Unmarshal(v, &anyVal); err == nil {
@@ -233,28 +246,92 @@ func loadConfig() (Config, bool, error) {
 
 	content, err := os.ReadFile(ConfigPath())
 	if err != nil {
+		if IsVercel() {
+			// Vercel one-click deploy may start without a writable/present config file.
+			// Keep an in-memory config so users can bootstrap via WebUI then sync env.
+			return Config{}, true, nil
+		}
 		return Config{}, false, err
 	}
 	var cfg Config
 	if err := json.Unmarshal(content, &cfg); err != nil {
 		return Config{}, false, err
 	}
+	if IsVercel() {
+		// Vercel filesystem is ephemeral/read-only for runtime writes; avoid save errors.
+		return cfg, true, nil
+	}
 	return cfg, false, nil
 }
 
 func parseConfigString(raw string) (Config, error) {
 	var cfg Config
-	if err := json.Unmarshal([]byte(raw), &cfg); err == nil {
-		return cfg, nil
+	candidates := []string{raw}
+	if normalized := normalizeConfigInput(raw); normalized != raw {
+		candidates = append(candidates, normalized)
 	}
-	decoded, err := base64.StdEncoding.DecodeString(raw)
+	for _, candidate := range candidates {
+		if err := json.Unmarshal([]byte(candidate), &cfg); err == nil {
+			return cfg, nil
+		}
+	}
+
+	base64Input := candidates[len(candidates)-1]
+	decoded, err := decodeConfigBase64(base64Input)
 	if err != nil {
-		return Config{}, err
+		return Config{}, fmt.Errorf("invalid DS2API_CONFIG_JSON: %w", err)
 	}
 	if err := json.Unmarshal(decoded, &cfg); err != nil {
-		return Config{}, err
+		return Config{}, fmt.Errorf("invalid DS2API_CONFIG_JSON decoded JSON: %w", err)
 	}
 	return cfg, nil
+}
+
+func normalizeConfigInput(raw string) string {
+	normalized := strings.TrimSpace(raw)
+	if normalized == "" {
+		return normalized
+	}
+	for {
+		changed := false
+		if len(normalized) >= 2 {
+			first := normalized[0]
+			last := normalized[len(normalized)-1]
+			if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+				normalized = strings.TrimSpace(normalized[1 : len(normalized)-1])
+				changed = true
+			}
+		}
+		if strings.HasPrefix(strings.ToLower(normalized), "base64:") {
+			normalized = strings.TrimSpace(normalized[len("base64:"):])
+			changed = true
+		}
+		if !changed {
+			break
+		}
+	}
+	return strings.TrimSpace(normalized)
+}
+
+func decodeConfigBase64(raw string) ([]byte, error) {
+	encodings := []*base64.Encoding{
+		base64.StdEncoding,
+		base64.RawStdEncoding,
+		base64.URLEncoding,
+		base64.RawURLEncoding,
+	}
+	var lastErr error
+	for _, enc := range encodings {
+		decoded, err := enc.DecodeString(raw)
+		if err == nil {
+			return decoded, nil
+		}
+		lastErr = err
+	}
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, errors.New("base64 decode failed")
 }
 
 func (s *Store) Snapshot() Config {

@@ -9,6 +9,7 @@ This document describes the actual behavior of the current Go codebase.
 ## Table of Contents
 
 - [Basics](#basics)
+- [Configuration Best Practice](#configuration-best-practice)
 - [Authentication](#authentication)
 - [Route Index](#route-index)
 - [Health Endpoints](#health-endpoints)
@@ -28,6 +29,28 @@ This document describes the actual behavior of the current Go codebase.
 | Default Content-Type | `application/json` |
 | Health probes | `GET /healthz`, `GET /readyz` |
 | CORS | Enabled (`Access-Control-Allow-Origin: *`, allows `Content-Type`, `Authorization`) |
+
+---
+
+## Configuration Best Practice
+
+Use `config.json` as the single source of truth:
+
+```bash
+cp config.example.json config.json
+# Edit config.json (keys/accounts)
+```
+
+Use it per deployment mode:
+
+- Local run: read `config.json` directly
+- Docker / Vercel: generate Base64 from `config.json`, then set `DS2API_CONFIG_JSON`
+
+```bash
+DS2API_CONFIG_JSON="$(base64 < config.json | tr -d '\n')"
+```
+
+For Vercel one-click bootstrap, you can set only `DS2API_ADMIN_KEY` first, then import config at `/admin` and sync env vars from the "Vercel Sync" page.
 
 ---
 

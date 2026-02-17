@@ -9,6 +9,7 @@
 ## 目录
 
 - [基础信息](#基础信息)
+- [配置最佳实践](#配置最佳实践)
 - [鉴权规则](#鉴权规则)
 - [路由总览](#路由总览)
 - [健康检查](#健康检查)
@@ -28,6 +29,28 @@
 | 默认 Content-Type | `application/json` |
 | 健康检查 | `GET /healthz`、`GET /readyz` |
 | CORS | 已启用（`Access-Control-Allow-Origin: *`，允许 `Content-Type`, `Authorization`） |
+
+---
+
+## 配置最佳实践
+
+推荐把 `config.json` 作为唯一配置源：
+
+```bash
+cp config.example.json config.json
+# 编辑 config.json（keys/accounts）
+```
+
+按部署方式使用：
+
+- 本地运行：直接读取 `config.json`
+- Docker / Vercel：从 `config.json` 生成 Base64，填入 `DS2API_CONFIG_JSON`
+
+```bash
+DS2API_CONFIG_JSON="$(base64 < config.json | tr -d '\n')"
+```
+
+Vercel 一键部署可先只填 `DS2API_ADMIN_KEY`，部署后在 `/admin` 导入配置，再通过 “Vercel 同步” 写回环境变量。
 
 ---
 

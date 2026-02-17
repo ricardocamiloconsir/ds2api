@@ -88,6 +88,19 @@ In addition, `/anthropic/v1/models` now includes historical Claude 1.x/2.x/3.x/4
 
 ## Quick Start
 
+### Universal First Step (all deployment modes)
+
+Use `config.json` as the single source of truth (recommended):
+
+```bash
+cp config.example.json config.json
+# Edit config.json
+```
+
+Recommended per deployment mode:
+- Local run: read `config.json` directly
+- Docker / Vercel: generate Base64 from `config.json` and inject as `DS2API_CONFIG_JSON`
+
 ### Option 1: Local Run
 
 **Prerequisites**: Go 1.24+, Node.js 20+ (only if building WebUI locally)
@@ -112,14 +125,20 @@ Default URL: `http://localhost:5001`
 ### Option 2: Docker
 
 ```bash
-# 1. Configure environment
+# 1. Prepare env file
 cp .env.example .env
-# Edit .env
 
-# 2. Start
+# 2. Generate DS2API_CONFIG_JSON from config.json (single-line Base64)
+DS2API_CONFIG_JSON="$(base64 < config.json | tr -d '\n')"
+
+# 3. Edit .env and set:
+#    DS2API_ADMIN_KEY=replace-with-a-strong-secret
+#    DS2API_CONFIG_JSON=${DS2API_CONFIG_JSON}
+
+# 4. Start
 docker-compose up -d
 
-# 3. View logs
+# 5. View logs
 docker-compose logs -f
 ```
 
@@ -129,8 +148,21 @@ Rebuild after updates: `docker-compose up -d --build`
 
 1. Fork this repo to your GitHub account
 2. Import the project on Vercel
-3. Set environment variables (minimum: `DS2API_ADMIN_KEY` and `DS2API_CONFIG_JSON`)
+3. Set environment variables (minimum: `DS2API_ADMIN_KEY`; recommended to also set `DS2API_CONFIG_JSON`)
 4. Deploy
+
+Recommended first step in repo root:
+
+```bash
+cp config.example.json config.json
+# Edit config.json
+```
+
+Recommended: convert `config.json` to Base64 locally, then paste into `DS2API_CONFIG_JSON` to avoid JSON formatting mistakes:
+
+```bash
+base64 < config.json | tr -d '\n'
+```
 
 > **Streaming note**: `/v1/chat/completions` on Vercel is routed to `api/chat-stream.js` (Node Runtime) for real-time SSE. Auth, account selection, and session/PoW preparation are still handled by the Go internal prepare endpoint; streaming output (including `tools`) is assembled on Node with Go-aligned anti-leak handling.
 
