@@ -131,7 +131,7 @@ docker-compose logs -f
 3. 配置环境变量（至少设置 `DS2API_ADMIN_KEY` 和 `DS2API_CONFIG_JSON`）
 4. 部署
 
-> **流式说明**：`/v1/chat/completions` 在 Vercel 上默认走 `api/chat-stream.js`（Node Runtime）以保证实时 SSE。鉴权、账号选择、会话/PoW 准备仍由 Go 内部 prepare 接口完成，Node 端仅转发流数据。
+> **流式说明**：`/v1/chat/completions` 在 Vercel 上默认走 `api/chat-stream.js`（Node Runtime）以保证实时 SSE。鉴权、账号选择、会话/PoW 准备仍由 Go 内部 prepare 接口完成；流式响应（含 `tools`）在 Node 侧执行与 Go 对齐的输出组装与防泄漏处理。
 
 详细部署说明请参阅 [部署指南](DEPLOY.md)。
 

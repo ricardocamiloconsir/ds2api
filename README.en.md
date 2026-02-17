@@ -131,7 +131,7 @@ Rebuild after updates: `docker-compose up -d --build`
 3. Set environment variables (minimum: `DS2API_ADMIN_KEY` and `DS2API_CONFIG_JSON`)
 4. Deploy
 
-> **Streaming note**: `/v1/chat/completions` on Vercel is routed to `api/chat-stream.js` (Node Runtime) for real-time SSE. Auth, account selection, session/PoW preparation are still handled by the Go internal prepare endpoint; Node only relays stream data.
+> **Streaming note**: `/v1/chat/completions` on Vercel is routed to `api/chat-stream.js` (Node Runtime) for real-time SSE. Auth, account selection, and session/PoW preparation are still handled by the Go internal prepare endpoint; streaming output (including `tools`) is assembled on Node with Go-aligned anti-leak handling.
 
 For detailed deployment instructions, see the [Deployment Guide](DEPLOY.en.md).
 

@@ -211,14 +211,15 @@ Vercel Go Runtime applies platform-level response buffering, so this project use
 1. `api/chat-stream.js` receives `/v1/chat/completions` request
 2. Node calls Go internal prepare endpoint (`?__stream_prepare=1`) for session ID, PoW, token
 3. Go prepare creates a stream lease, locking the account
-4. Node connects directly to DeepSeek upstream, relays SSE in real-time to client
+4. Node connects directly to DeepSeek upstream, relays SSE in real-time to client (including OpenAI chunk framing and tools anti-leak sieve)
 5. After stream ends, Node calls Go release endpoint (`?__stream_release=1`) to free the account
 
 > This adaptation is **Vercel-only**; local and Docker remain pure Go.
 
-#### Non-Stream and Tool Call Fallback
+#### Non-Stream Fallback and Tool Call Handling
 
-- `api/chat-stream.js` automatically falls back to Go entry (`?__go=1`) for non-stream requests or requests with `tools`
+- `api/chat-stream.js` falls back to Go entry (`?__go=1`) for non-stream requests only
+- Streaming requests (including requests with `tools`) stay on the Node path and use Go-aligned tool-call anti-leak handling
 - WebUI non-stream test calls `?__go=1` directly to avoid Node hop timeout on long requests
 
 #### Function Duration

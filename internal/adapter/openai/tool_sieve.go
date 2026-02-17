@@ -96,10 +96,7 @@ func flushToolSieve(state *toolStreamSieveState, toolNames []string) []toolStrea
 				events = append(events, toolStreamEvent{Content: consumedSuffix})
 			}
 		} else {
-			raw := state.capture.String()
-			if raw != "" {
-				events = append(events, toolStreamEvent{Content: raw})
-			}
+			// Incomplete captured tool JSON at stream end: suppress raw capture.
 		}
 		state.capture.Reset()
 		state.capturing = false
@@ -176,7 +173,9 @@ func consumeToolCapture(captured string, toolNames []string) (prefix string, cal
 	}
 	parsed := util.ParseToolCalls(obj, toolNames)
 	if len(parsed) == 0 {
-		return captured[:end], nil, captured[end:], true
+		// `tool_calls` key exists but strict JSON parse failed.
+		// Drop the captured object body to avoid leaking raw tool JSON.
+		return captured[:start], nil, captured[end:], true
 	}
 	return captured[:start], parsed, captured[end:], true
 }
