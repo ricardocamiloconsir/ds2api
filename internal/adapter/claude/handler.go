@@ -98,43 +98,15 @@ func (h *Handler) Messages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result := sse.CollectStream(resp, stdReq.Thinking, true)
-	fullText := result.Text
-	fullThinking := result.Thinking
-	detected := util.ParseToolCalls(fullText, stdReq.ToolNames)
-	content := make([]map[string]any, 0, 4)
-	if fullThinking != "" {
-		content = append(content, map[string]any{"type": "thinking", "thinking": fullThinking})
-	}
-	stopReason := "end_turn"
-	if len(detected) > 0 {
-		stopReason = "tool_use"
-		for i, tc := range detected {
-			content = append(content, map[string]any{
-				"type":  "tool_use",
-				"id":    fmt.Sprintf("toolu_%d_%d", time.Now().Unix(), i),
-				"name":  tc.Name,
-				"input": tc.Input,
-			})
-		}
-	} else {
-		if fullText == "" {
-			fullText = "抱歉，没有生成有效的响应内容。"
-		}
-		content = append(content, map[string]any{"type": "text", "text": fullText})
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"id":            fmt.Sprintf("msg_%d", time.Now().UnixNano()),
-		"type":          "message",
-		"role":          "assistant",
-		"model":         stdReq.ResponseModel,
-		"content":       content,
-		"stop_reason":   stopReason,
-		"stop_sequence": nil,
-		"usage": map[string]any{
-			"input_tokens":  util.EstimateTokens(fmt.Sprintf("%v", norm.NormalizedMessages)),
-			"output_tokens": util.EstimateTokens(fullThinking) + util.EstimateTokens(fullText),
-		},
-	})
+	respBody := util.BuildClaudeMessageResponse(
+		fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+		stdReq.ResponseModel,
+		norm.NormalizedMessages,
+		result.Thinking,
+		result.Text,
+		stdReq.ToolNames,
+	)
+	writeJSON(w, http.StatusOK, respBody)
 }
 
 func (h *Handler) CountTokens(w http.ResponseWriter, r *http.Request) {

@@ -136,36 +136,8 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, ctx context.Context, re
 
 	finalThinking := result.Thinking
 	finalText := result.Text
-	detected := util.ParseToolCalls(finalText, toolNames)
-	finishReason := "stop"
-	messageObj := map[string]any{"role": "assistant", "content": finalText}
-	if thinkingEnabled && finalThinking != "" {
-		messageObj["reasoning_content"] = finalThinking
-	}
-	if len(detected) > 0 {
-		finishReason = "tool_calls"
-		messageObj["tool_calls"] = util.FormatOpenAIToolCalls(detected)
-		messageObj["content"] = nil
-	}
-	promptTokens := util.EstimateTokens(finalPrompt)
-	reasoningTokens := util.EstimateTokens(finalThinking)
-	completionTokens := util.EstimateTokens(finalText)
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"id":      completionID,
-		"object":  "chat.completion",
-		"created": time.Now().Unix(),
-		"model":   model,
-		"choices": []map[string]any{{"index": 0, "message": messageObj, "finish_reason": finishReason}},
-		"usage": map[string]any{
-			"prompt_tokens":     promptTokens,
-			"completion_tokens": reasoningTokens + completionTokens,
-			"total_tokens":      promptTokens + reasoningTokens + completionTokens,
-			"completion_tokens_details": map[string]any{
-				"reasoning_tokens": reasoningTokens,
-			},
-		},
-	})
+	respBody := util.BuildOpenAIChatCompletion(completionID, model, finalPrompt, finalThinking, finalText, toolNames)
+	writeJSON(w, http.StatusOK, respBody)
 }
 
 func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *http.Response, completionID, model, finalPrompt string, thinkingEnabled, searchEnabled bool, toolNames []string) {

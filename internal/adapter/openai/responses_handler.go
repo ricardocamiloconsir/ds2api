@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -115,7 +114,7 @@ func (h *Handler) handleResponsesNonStream(w http.ResponseWriter, resp *http.Res
 		return
 	}
 	result := sse.CollectStream(resp, thinkingEnabled, true)
-	responseObj := buildResponseObject(responseID, model, finalPrompt, result.Thinking, result.Text, toolNames)
+	responseObj := util.BuildOpenAIResponseObject(responseID, model, finalPrompt, result.Thinking, result.Text, toolNames)
 	h.getResponseStore().put(owner, responseID, responseObj)
 	writeJSON(w, http.StatusOK, responseObj)
 }
@@ -189,7 +188,7 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 				}
 			}
 		}
-		obj := buildResponseObject(responseID, model, finalPrompt, finalThinking, finalText, toolNames)
+		obj := util.BuildOpenAIResponseObject(responseID, model, finalPrompt, finalThinking, finalText, toolNames)
 		if toolCallsEmitted {
 			obj["status"] = "completed"
 		}
@@ -279,62 +278,6 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 				}
 			}
 		}
-	}
-}
-
-func buildResponseObject(responseID, model, finalPrompt, finalThinking, finalText string, toolNames []string) map[string]any {
-	detected := util.ParseToolCalls(finalText, toolNames)
-	output := make([]any, 0, 2)
-	if len(detected) > 0 {
-		toolCalls := make([]any, 0, len(detected))
-		for _, tc := range detected {
-			toolCalls = append(toolCalls, map[string]any{
-				"type":      "tool_call",
-				"name":      tc.Name,
-				"arguments": tc.Input,
-			})
-		}
-		output = append(output, map[string]any{
-			"type":       "tool_calls",
-			"tool_calls": toolCalls,
-		})
-	} else {
-		content := []any{
-			map[string]any{
-				"type": "output_text",
-				"text": finalText,
-			},
-		}
-		if finalThinking != "" {
-			content = append([]any{map[string]any{
-				"type": "reasoning",
-				"text": finalThinking,
-			}}, content...)
-		}
-		output = append(output, map[string]any{
-			"type":    "message",
-			"id":      "msg_" + strings.ReplaceAll(uuid.NewString(), "-", ""),
-			"role":    "assistant",
-			"content": content,
-		})
-	}
-	promptTokens := util.EstimateTokens(finalPrompt)
-	reasoningTokens := util.EstimateTokens(finalThinking)
-	completionTokens := util.EstimateTokens(finalText)
-	return map[string]any{
-		"id":          responseID,
-		"type":        "response",
-		"object":      "response",
-		"created_at":  time.Now().Unix(),
-		"status":      "completed",
-		"model":       model,
-		"output":      output,
-		"output_text": finalText,
-		"usage": map[string]any{
-			"input_tokens":  promptTokens,
-			"output_tokens": reasoningTokens + completionTokens,
-			"total_tokens":  promptTokens + reasoningTokens + completionTokens,
-		},
 	}
 }
 
