@@ -178,6 +178,51 @@ test('sieve emits incremental tool_call_deltas for split arguments payload', () 
   assert.equal(argsJoined.includes('"mode":"head"'), true);
 });
 
+test('sieve preserves filtered tool json as text after incremental probe', () => {
+  const state = createToolSieveState();
+  const first = processToolSieveChunk(
+    state,
+    '{"tool_calls":[{"name":"unknown_tool","input":{"q":"hel',
+    ['read_file'],
+  );
+  const second = processToolSieveChunk(
+    state,
+    'lo"}}]}继续正文。',
+    ['read_file'],
+  );
+  const tail = flushToolSieve(state, ['read_file']);
+  const events = [...first, ...second, ...tail];
+  const leakedText = collectText(events);
+  const hasToolCall = events.some((evt) => evt.type === 'tool_calls' && evt.calls?.length > 0);
+  assert.equal(hasToolCall, false);
+  assert.equal(leakedText.toLowerCase().includes('tool_calls'), true);
+  assert.equal(leakedText.includes('unknown_tool'), true);
+  assert.equal(leakedText.includes('继续正文。'), true);
+});
+
+test('sieve re-scans suffix after filtered first tool block and still emits later valid call', () => {
+  const state = createToolSieveState();
+  const first = processToolSieveChunk(
+    state,
+    '{"tool_calls":[{"name":"unknown_tool","input":{"q":"hel',
+    ['read_file'],
+  );
+  const second = processToolSieveChunk(
+    state,
+    'lo"}}]}{"tool_calls":[{"name":"read_file","input":{"path":"README.MD"}}]}尾文',
+    ['read_file'],
+  );
+  const tail = flushToolSieve(state, ['read_file']);
+  const events = [...first, ...second, ...tail];
+  const leakedText = collectText(events);
+  const emittedToolCall = events.some((evt) => evt.type === 'tool_calls' && evt.calls?.some((call) => call.name === 'read_file'));
+  const emittedToolDelta = events.some((evt) => evt.type === 'tool_call_deltas' && evt.deltas?.some((delta) => delta.name === 'read_file'));
+
+  assert.equal(emittedToolCall || emittedToolDelta, true);
+  assert.equal(leakedText.includes('unknown_tool'), true);
+  assert.equal(leakedText.includes('尾文'), true);
+});
+
 test('sieve still intercepts tool call after leading plain text without suffix', () => {
   const events = runSieve(
     ['我将调用工具。', '{"tool_calls":[{"name":"read_file","input":{"path":"README.MD"}}]}'],
