@@ -233,6 +233,8 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # 个人账号可留空
 | `DS2API_ACCOUNT_CONCURRENCY` | 同上（兼容别名） | — |
 | `DS2API_ACCOUNT_MAX_QUEUE` | 等待队列上限 | `recommended_concurrency` |
 | `DS2API_ACCOUNT_QUEUE_SIZE` | 同上（兼容别名） | — |
+| `DS2API_GLOBAL_MAX_INFLIGHT` | 全局并发上限 | `recommended_concurrency` |
+| `DS2API_MAX_INFLIGHT` | 同上（兼容别名） | — |
 | `DS2API_VERCEL_INTERNAL_SECRET` | 混合流式内部鉴权 | 回退用 `DS2API_ADMIN_KEY` |
 | `DS2API_VERCEL_STREAM_LEASE_TTL_SECONDS` | 流式 lease TTL | `900` |
 | `VERCEL_TOKEN` | Vercel 同步 token | — |
@@ -359,8 +361,8 @@ No Output Directory named "public" found after the Build completed.
 ```bash
 # 1. 下载对应平台的压缩包
 # 2. 解压
-tar -xzf ds2api_v1.7.0_linux_amd64.tar.gz
-cd ds2api_v1.7.0_linux_amd64
+tar -xzf ds2api_<tag>_linux_amd64.tar.gz
+cd ds2api_<tag>_linux_amd64
 
 # 3. 配置
 cp config.example.json config.json
@@ -372,7 +374,7 @@ cp config.example.json config.json
 
 ### 维护者发布步骤
 
-1. 在 GitHub 创建并发布 Release（带 tag，如 `v1.7.0`）
+1. 在 GitHub 创建并发布 Release（带 tag，如 `vX.Y.Z`）
 2. 等待 Actions 工作流 `Release Artifacts` 完成
 3. 在 Release 的 Assets 下载对应平台压缩包
 

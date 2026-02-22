@@ -233,6 +233,8 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # optional for personal accounts
 | `DS2API_ACCOUNT_CONCURRENCY` | Alias (legacy compat) | — |
 | `DS2API_ACCOUNT_MAX_QUEUE` | Waiting queue limit | `recommended_concurrency` |
 | `DS2API_ACCOUNT_QUEUE_SIZE` | Alias (legacy compat) | — |
+| `DS2API_GLOBAL_MAX_INFLIGHT` | Global inflight limit | `recommended_concurrency` |
+| `DS2API_MAX_INFLIGHT` | Alias (legacy compat) | — |
 | `DS2API_VERCEL_INTERNAL_SECRET` | Hybrid streaming internal auth | Falls back to `DS2API_ADMIN_KEY` |
 | `DS2API_VERCEL_STREAM_LEASE_TTL_SECONDS` | Stream lease TTL | `900` |
 | `VERCEL_TOKEN` | Vercel sync token | — |
@@ -359,8 +361,8 @@ Each archive includes:
 ```bash
 # 1. Download the archive for your platform
 # 2. Extract
-tar -xzf ds2api_v1.7.0_linux_amd64.tar.gz
-cd ds2api_v1.7.0_linux_amd64
+tar -xzf ds2api_<tag>_linux_amd64.tar.gz
+cd ds2api_<tag>_linux_amd64
 
 # 3. Configure
 cp config.example.json config.json
@@ -372,7 +374,7 @@ cp config.example.json config.json
 
 ### Maintainer Release Flow
 
-1. Create and publish a GitHub Release (with tag, e.g. `v1.7.0`)
+1. Create and publish a GitHub Release (with tag, for example `vX.Y.Z`)
 2. Wait for the `Release Artifacts` workflow to complete
 3. Download the matching archive from Release Assets
 
