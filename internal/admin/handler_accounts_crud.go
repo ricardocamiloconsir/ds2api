@@ -64,6 +64,10 @@ func (h *Handler) listAccounts(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) addAccount(w http.ResponseWriter, r *http.Request) {
 	var req map[string]any
 	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	fmt.Printf("[ADD] Received request: email='%s', mobile='%s', password_len=%d, token_len=%d\n",
+		fieldString(req, "email"), fieldString(req, "mobile"), len(fieldString(req, "password")), len(fieldString(req, "token")))
+
 	acc := toAccount(req)
 	if acc.Identifier() == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "需要 email 或 mobile"})
@@ -91,6 +95,7 @@ func (h *Handler) addAccount(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "identifier")
+	fmt.Printf("[DELETE] Received identifier: %s\n", identifier)
 	err := h.Store.Update(func(c *config.Config) error {
 		idx := -1
 		for i, a := range c.Accounts {
@@ -100,23 +105,31 @@ func (h *Handler) deleteAccount(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if idx < 0 {
+			fmt.Printf("[DELETE] Account not found: %s\n", identifier)
 			return fmt.Errorf("账号不存在")
 		}
+		fmt.Printf("[DELETE] Deleting account at index %d\n", idx)
 		c.Accounts = append(c.Accounts[:idx], c.Accounts[idx+1:]...)
 		return nil
 	})
 	if err != nil {
+		fmt.Printf("[DELETE] Error: %v\n", err)
 		writeJSON(w, http.StatusNotFound, map[string]any{"detail": err.Error()})
 		return
 	}
 	h.Pool.Reset()
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_accounts": len(h.Store.Snapshot().Accounts)})
+	totalAccounts := len(h.Store.Snapshot().Accounts)
+	fmt.Printf("[DELETE] Success. Total accounts: %d\n", totalAccounts)
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_accounts": totalAccounts})
 }
 
 func (h *Handler) updateAccount(w http.ResponseWriter, r *http.Request) {
 	identifier := chi.URLParam(r, "identifier")
 	var req map[string]any
 	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	fmt.Printf("[UPDATE] Received request: identifier='%s', email='%s', mobile='%s', password_len=%d, token_len=%d\n",
+		identifier, fieldString(req, "email"), fieldString(req, "mobile"), len(fieldString(req, "password")), len(fieldString(req, "token")))
 
 	updatedAcc := toAccount(req)
 
@@ -132,6 +145,8 @@ func (h *Handler) updateAccount(w http.ResponseWriter, r *http.Request) {
 			return fmt.Errorf("账号不存在")
 		}
 
+		fmt.Printf("[UPDATE] Before update: email='%s', password_len=%d\n", c.Accounts[idx].Email, len(c.Accounts[idx].Password))
+
 		if updatedAcc.Email != "" {
 			c.Accounts[idx].Email = updatedAcc.Email
 		}
@@ -144,6 +159,8 @@ func (h *Handler) updateAccount(w http.ResponseWriter, r *http.Request) {
 		if updatedAcc.Token != "" {
 			c.Accounts[idx].Token = updatedAcc.Token
 		}
+
+		fmt.Printf("[UPDATE] After update: email='%s', password_len=%d\n", c.Accounts[idx].Email, len(c.Accounts[idx].Password))
 
 		return nil
 	})

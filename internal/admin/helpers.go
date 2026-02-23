@@ -3,6 +3,7 @@ package admin
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -84,16 +85,36 @@ func statusOr(v int, d int) int {
 
 func accountMatchesIdentifier(acc config.Account, identifier string) bool {
 	id := strings.TrimSpace(identifier)
+
+	decodedId, err := url.QueryUnescape(id)
+	if err == nil {
+		id = decodedId
+	}
+
+	email := strings.TrimSpace(acc.Email)
+	mobile := strings.TrimSpace(acc.Mobile)
+	accId := acc.Identifier()
+
+	fmt.Printf("[MATCH] Comparing: id='%s' (decoded='%s'), email='%s', mobile='%s', accId='%s'\n", strings.TrimSpace(identifier), id, email, mobile, accId)
+
 	if id == "" {
+		fmt.Printf("[MATCH] ID is empty\n")
 		return false
 	}
-	if strings.TrimSpace(acc.Email) == id {
+	if email == id {
+		fmt.Printf("[MATCH] Matched by email\n")
 		return true
 	}
-	if strings.TrimSpace(acc.Mobile) == id {
+	if mobile == id {
+		fmt.Printf("[MATCH] Matched by mobile\n")
 		return true
 	}
-	return acc.Identifier() == id
+	if accId == id {
+		fmt.Printf("[MATCH] Matched by Identifier()\n")
+		return true
+	}
+	fmt.Printf("[MATCH] No match found\n")
+	return false
 }
 
 func findAccountByIdentifier(store ConfigStore, identifier string) (config.Account, bool) {

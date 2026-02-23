@@ -16,10 +16,18 @@ import (
 	"ds2api/internal/sse"
 )
 
+func safeTruncate(s string, maxLen int) string {
+	if len(s) > maxLen {
+		return s[:maxLen] + "..."
+	}
+	return s
+}
+
 func (h *Handler) testSingleAccount(w http.ResponseWriter, r *http.Request) {
 	var req map[string]any
 	_ = json.NewDecoder(r.Body).Decode(&req)
 	identifier, _ := req["identifier"].(string)
+	fmt.Printf("[TEST] Received identifier: '%s'\n", identifier)
 	if strings.TrimSpace(identifier) == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "需要账号标识（identifier / email / mobile）"})
 		return
@@ -29,6 +37,7 @@ func (h *Handler) testSingleAccount(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"detail": "账号不存在"})
 		return
 	}
+	fmt.Printf("[TEST] Found account: email='%s', password_len=%d, token='%s...'\n", acc.Email, len(acc.Password), safeTruncate(acc.Token, 10))
 	model, _ := req["model"].(string)
 	if model == "" {
 		model = "deepseek-chat"

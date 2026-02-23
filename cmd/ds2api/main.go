@@ -7,9 +7,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/joho/godotenv"
 
 	"ds2api/internal/auth"
 	"ds2api/internal/config"
@@ -18,12 +21,29 @@ import (
 )
 
 func main() {
+	workDir, _ := os.Getwd()
+	envPath := filepath.Join(workDir, ".env")
+	
+	envMap, err := godotenv.Read(envPath)
+	if err != nil {
+		fmt.Printf("Error loading .env file: %v\n", err)
+	} else {
+		fmt.Printf(".env file loaded successfully\n")
+		for k, v := range envMap {
+			os.Setenv(k, v)
+		}
+	}
+	
 	webui.EnsureBuiltOnStartup()
-	_ = auth.AdminKey()
+	adminKey := auth.AdminKey()
+	fmt.Printf("DS2API_ADMIN_KEY loaded: %s...\n", adminKey)
+	_ = adminKey
 	app := server.NewApp()
 	port := strings.TrimSpace(os.Getenv("PORT"))
+	fmt.Printf("PORT from env: '%s'\n", port)
 	if port == "" {
 		port = "5001"
+		fmt.Printf("Using default port: %s\n", port)
 	}
 
 	srv := &http.Server{
