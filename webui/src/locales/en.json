@@ -55,6 +55,7 @@
         "deleted": "Deleted successfully",
         "deleteFailed": "Delete failed",
         "failedToAdd": "Failed to add",
+        "failedToUpdate": "Failed to update account.",
         "networkError": "Network error.",
         "requestFailed": "Request failed.",
         "generationStopped": "Generation stopped.",
@@ -110,6 +111,7 @@
         "accountsDesc": "Manage the DeepSeek account pool",
         "testAll": "Test all",
         "addAccount": "Add account",
+        "editAccount": "Edit account",
         "testingAllAccounts": "Testing all accounts...",
         "sessionActive": "Session active",
         "reauthRequired": "Re-auth required",
@@ -128,6 +130,10 @@
         "passwordPlaceholder": "Account password",
         "addAccountLoading": "Adding...",
         "addAccountAction": "Add account",
+        "updateAccountSuccess": "Account updated successfully.",
+        "editAccountTitle": "Edit DeepSeek account",
+        "updateAccountAction": "Update account",
+        "updateAccountLoading": "Updating...",
         "pageInfo": "Page {current}/{total}, {count} accounts total"
     },
     "apiTester": {

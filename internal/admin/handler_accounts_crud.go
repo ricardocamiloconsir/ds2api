@@ -112,3 +112,46 @@ func (h *Handler) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	h.Pool.Reset()
 	writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_accounts": len(h.Store.Snapshot().Accounts)})
 }
+
+func (h *Handler) updateAccount(w http.ResponseWriter, r *http.Request) {
+	identifier := chi.URLParam(r, "identifier")
+	var req map[string]any
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	updatedAcc := toAccount(req)
+
+	err := h.Store.Update(func(c *config.Config) error {
+		idx := -1
+		for i, a := range c.Accounts {
+			if accountMatchesIdentifier(a, identifier) {
+				idx = i
+				break
+			}
+		}
+		if idx < 0 {
+			return fmt.Errorf("账号不存在")
+		}
+
+		if updatedAcc.Email != "" {
+			c.Accounts[idx].Email = updatedAcc.Email
+		}
+		if updatedAcc.Mobile != "" {
+			c.Accounts[idx].Mobile = updatedAcc.Mobile
+		}
+		if updatedAcc.Password != "" {
+			c.Accounts[idx].Password = updatedAcc.Password
+		}
+		if updatedAcc.Token != "" {
+			c.Accounts[idx].Token = updatedAcc.Token
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"detail": err.Error()})
+		return
+	}
+	h.Pool.Reset()
+	writeJSON(w, http.StatusOK, map[string]any{"success": true})
+}

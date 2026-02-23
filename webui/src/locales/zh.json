@@ -55,6 +55,7 @@
         "deleted": "删除成功",
         "deleteFailed": "删除失败",
         "failedToAdd": "添加失败",
+        "failedToUpdate": "更新失败",
         "networkError": "网络错误",
         "requestFailed": "请求失败",
         "generationStopped": "已停止生成",
@@ -110,6 +111,7 @@
         "accountsDesc": "管理 DeepSeek 账号池",
         "testAll": "测试全部",
         "addAccount": "添加账号",
+        "editAccount": "编辑账号",
         "testingAllAccounts": "正在测试所有账号...",
         "sessionActive": "已建立会话",
         "reauthRequired": "需重新登录",
@@ -128,6 +130,10 @@
         "passwordPlaceholder": "账号密码",
         "addAccountLoading": "添加中...",
         "addAccountAction": "添加账号",
+        "updateAccountSuccess": "账号更新成功。",
+        "editAccountTitle": "编辑 DeepSeek 账号",
+        "updateAccountAction": "更新账号",
+        "updateAccountLoading": "更新中...",
         "pageInfo": "第 {current}/{total} 页，共 {count} 个账号"
     },
     "apiTester": {

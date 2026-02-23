@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Play, Plus, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Edit, Play, Plus, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 
 export default function AccountsTable({
@@ -16,6 +16,7 @@ export default function AccountsTable({
     onShowAddAccount,
     onTestAccount,
     onDeleteAccount,
+    onEditAccount,
     onPrevPage,
     onNextPage,
 }) {
@@ -98,6 +99,12 @@ export default function AccountsTable({
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 self-start lg:self-auto ml-5 lg:ml-0">
+                                    <button
+                                        onClick={() => onEditAccount(acc)}
+                                        className="p-1 lg:p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors"
+                                    >
+                                        <Edit className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                                    </button>
                                     <button
                                         onClick={() => onTestAccount(id)}
                                         disabled={testing[id]}

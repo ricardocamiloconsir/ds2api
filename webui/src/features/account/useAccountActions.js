@@ -3,9 +3,11 @@ import { useState } from 'react'
 export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, fetchAccounts, resolveAccountIdentifier }) {
     const [showAddKey, setShowAddKey] = useState(false)
     const [showAddAccount, setShowAddAccount] = useState(false)
+    const [showEditAccount, setShowEditAccount] = useState(false)
     const [newKey, setNewKey] = useState('')
     const [copiedKey, setCopiedKey] = useState(null)
     const [newAccount, setNewAccount] = useState({ email: '', mobile: '', password: '' })
+    const [editingAccount, setEditingAccount] = useState({ email: '', mobile: '', password: '', identifier: '' })
     const [loading, setLoading] = useState(false)
     const [testing, setTesting] = useState({})
     const [testingAll, setTestingAll] = useState(false)
@@ -170,17 +172,64 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
         setTestingAll(false)
     }
 
+    const openEditModal = (account) => {
+        setEditingAccount({
+            email: account.email || '',
+            mobile: account.mobile || '',
+            password: '',
+            identifier: account.identifier,
+        })
+        setShowEditAccount(true)
+    }
+
+    const updateAccount = async () => {
+        if (!editingAccount.password || (!editingAccount.email && !editingAccount.mobile)) {
+            onMessage('error', t('accountManager.requiredFields'))
+            return
+        }
+        setLoading(true)
+        try {
+            const res = await apiFetch(`/admin/accounts/${encodeURIComponent(editingAccount.identifier)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: editingAccount.email,
+                    mobile: editingAccount.mobile,
+                    password: editingAccount.password,
+                }),
+            })
+            if (res.ok) {
+                onMessage('success', t('accountManager.updateAccountSuccess'))
+                setShowEditAccount(false)
+                setEditingAccount({ email: '', mobile: '', password: '', identifier: '' })
+                fetchAccounts()
+                onRefresh()
+            } else {
+                const data = await res.json()
+                onMessage('error', data.detail || t('messages.failedToUpdate'))
+            }
+        } catch (e) {
+            onMessage('error', t('messages.networkError'))
+        } finally {
+            setLoading(false)
+        }
+    }
+
     return {
         showAddKey,
         setShowAddKey,
         showAddAccount,
         setShowAddAccount,
+        showEditAccount,
+        setShowEditAccount,
         newKey,
         setNewKey,
         copiedKey,
         setCopiedKey,
         newAccount,
         setNewAccount,
+        editingAccount,
+        setEditingAccount,
         loading,
         testing,
         testingAll,
@@ -191,5 +240,7 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
         deleteAccount,
         testAccount,
         testAllAccounts,
+        openEditModal,
+        updateAccount,
     }
 }

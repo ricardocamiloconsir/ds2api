@@ -6,6 +6,7 @@ import ApiKeysPanel from './ApiKeysPanel'
 import AccountsTable from './AccountsTable'
 import AddKeyModal from './AddKeyModal'
 import AddAccountModal from './AddAccountModal'
+import EditAccountModal from './EditAccountModal'
 
 export default function AccountManagerContainer({ config, onRefresh, onMessage, authFetch }) {
     const { t } = useI18n()
@@ -29,12 +30,16 @@ export default function AccountManagerContainer({ config, onRefresh, onMessage, 
         setShowAddKey,
         showAddAccount,
         setShowAddAccount,
+        showEditAccount,
+        setShowEditAccount,
         newKey,
         setNewKey,
         copiedKey,
         setCopiedKey,
         newAccount,
         setNewAccount,
+        editingAccount,
+        setEditingAccount,
         loading,
         testing,
         testingAll,
@@ -45,6 +50,8 @@ export default function AccountManagerContainer({ config, onRefresh, onMessage, 
         deleteAccount,
         testAccount,
         testAllAccounts,
+        openEditModal,
+        updateAccount,
     } = useAccountActions({
         apiFetch,
         t,
@@ -85,6 +92,7 @@ export default function AccountManagerContainer({ config, onRefresh, onMessage, 
                 onShowAddAccount={() => setShowAddAccount(true)}
                 onTestAccount={testAccount}
                 onDeleteAccount={deleteAccount}
+                onEditAccount={openEditModal}
                 onPrevPage={() => fetchAccounts(page - 1)}
                 onNextPage={() => fetchAccounts(page + 1)}
             />
@@ -107,6 +115,16 @@ export default function AccountManagerContainer({ config, onRefresh, onMessage, 
                 loading={loading}
                 onClose={() => setShowAddAccount(false)}
                 onAdd={addAccount}
+            />
+
+            <EditAccountModal
+                show={showEditAccount}
+                t={t}
+                account={editingAccount}
+                setAccount={setEditingAccount}
+                loading={loading}
+                onClose={() => setShowEditAccount(false)}
+                onUpdate={updateAccount}
             />
         </div>
     )

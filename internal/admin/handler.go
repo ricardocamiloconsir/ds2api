@@ -27,6 +27,7 @@ func RegisterRoutes(r chi.Router, h *Handler) {
 		pr.Delete("/keys/{key}", h.deleteKey)
 		pr.Get("/accounts", h.listAccounts)
 		pr.Post("/accounts", h.addAccount)
+		pr.Put("/accounts/{identifier}", h.updateAccount)
 		pr.Delete("/accounts/{identifier}", h.deleteAccount)
 		pr.Get("/queue/status", h.queueStatus)
 		pr.Post("/accounts/test", h.testSingleAccount)
