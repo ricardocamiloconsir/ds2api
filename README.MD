@@ -1,3 +1,160 @@
+✅ **Melhor opção LOCAL (sem Vercel, sem Docker): Executar com Go (go run)**
+
+Depois de analisar todas as opções **puramente locais** disponíveis hoje (23/fev/2026):
+
+| Opção Local              | Facilidade (Windows) | Risco de erro no config | Performance | Recomendado para você? |
+|--------------------------|----------------------|--------------------------|-------------|------------------------|
+| **Go run / go build**    | ★★★★★               | Nenhum (JSON direto)    | Nativa     | **MELHOR**            |
+| Docker Compose           | ★★★★                | Alto (Base64)           | Boa        | Boa alternativa       |
+| Binário Release          | —                   | —                       | —          | Não disponível no v2.1.7 |
+
+**A vencedora absoluta para você (dev frontend no Windows):**  
+**Go run** — porque resolve exatamente o problema que você estava tendo com Base64 corrompido. O `config.json` fica no disco, você edita direto, sem conversão, sem risco de senha quebrada.
+
+---
+
+### Tutorial Completo: DS2API Local com Go (Windows) – 10 minutos
+
+#### Passo 1: Instalar o Go (uma única vez)
+
+1. Acesse: https://go.dev/dl/
+2. Baixe o **Go 1.24+ para Windows** (arquivo `.msi`)
+3. Execute o instalador → Next → Next → Finish (aceite tudo padrão)
+4. Reinicie o PowerShell ou o PC (importante!)
+5. Verifique:
+   ```powershell
+   go version
+   ```
+   Deve aparecer `go1.24.x windows/amd64`
+
+#### Passo 2: Clonar e preparar o projeto
+
+```powershell
+# 1. Clone (ou baixe ZIP)
+git clone https://github.com/CJackHwang/ds2api.git
+cd ds2api
+
+# 2. Copie o config de exemplo
+Copy-Item config.example.json config.json
+```
+
+#### Passo 3: Editar o config.json (agora SEM risco!)
+
+Abra o `config.json` no **Zed** ou VS Code e deixe assim (exemplo otimizado para dev frontend):
+
+```json
+{
+  "keys": ["sk-local-2026-super-secreta"],
+  "accounts": [
+    {
+      "email": "camillusbloodfallen3@gmail.com",
+      "password": "SUA_SENHA_AQUI",
+      "token": ""
+    },
+    {
+      "email": "camillusbloodfallen@gmail.com",
+      "password": "SUA_SENHA_AQUI",
+      "token": ""
+    },
+    {
+      "email": "camillusbloodfallen3@gmail.com",
+      "password": "SUA_SENHA_AQUI",
+      "token": ""
+    }
+  ],
+  "model_aliases": {
+    "gpt-4o": "deepseek-chat",
+    "claude-4": "deepseek-reasoner",
+    "o3": "deepseek-reasoner",
+    "deepseek-reasoner": "deepseek-reasoner"
+  },
+  "runtime": {
+    "account_max_inflight": 3
+  }
+}
+```
+
+**Salve** o arquivo.
+
+#### Passo 4: Rodar o DS2API
+
+No mesmo PowerShell (dentro da pasta `ds2api`):
+
+```powershell
+go run ./cmd/ds2api
+```
+
+Primeira execução:
+- Vai baixar as dependências Go automaticamente
+- Vai detectar que `static/admin` não existe → vai pedir Node.js para construir o WebUI automaticamente (você provavelmente já tem Node)
+
+Se pedir Node:
+- Confirme que tem Node 20+ (`node -v`)
+- Ele vai rodar `npm install && npm run build` sozinho
+
+Depois de ~30-60 segundos, você vai ver:
+
+```
+2026/02/23 11:xx:xx INFO  DS2API v2.1.7 starting...
+INFO  Listening on http://0.0.0.0:5001
+```
+
+**Pronto!** Acesse:
+- API: http://localhost:5001/v1/models
+- Painel Admin: http://localhost:5001/admin (usuário `admin`, senha = `DS2API_ADMIN_KEY` ou deixe padrão)
+
+#### Passo 5: Testar as contas
+
+No navegador:
+1. Abra http://localhost:5001/admin
+2. Vá em **Account Management**
+3. Clique em **Test all**
+
+Agora as contas devem ficar verdes rapidinho (sem Re-auth).
+
+---
+
+### Como usar no Zed / VS Code / Trae.ai
+
+Base URL: `http://localhost:5001/v1`  
+API Key: `sk-local-2026-super-secreta` (a que você colocou em `"keys"`)
+
+---
+
+### Comandos úteis
+
+- Parar: `Ctrl + C`
+- Rodar em background (opcional):
+  ```powershell
+  Start-Process powershell -ArgumentList "go run ./cmd/ds2api"
+  ```
+- Atualizar o projeto:
+  ```powershell
+  git pull
+  go run ./cmd/ds2api
+  ```
+
+---
+
+### Quer ainda mais fácil? (Alternativa Docker pura local sem Base64)
+
+Se você não quiser instalar Go, posso te dar em 10 segundos um `docker-compose.yml` modificado que usa **volume + config.json direto** (sem Base64). É só falar.
+
+Mas sinceramente: **Go run é a melhor experiência local** para quem vai usar todo dia.
+
+Faça os passos agora e me fala:
+- Conseguiu rodar?
+- Apareceu o painel?
+- As contas ficaram verdes?
+
+Qualquer erro (cola a mensagem), resolvo em 30 segundos.  
+
+Você vai ter DS2API local voando, com deepseek-reasoner ilimitado, sem depender de internet externa nem Vercel. 🔥
+
+Vamos nessa?
+
+---
+
 ✅ **Tutorial Completo: Instalar DS2API + Usar no Zed (Fevereiro 2026)**
 
 Como você é dev frontend, montei um guia **super prático, direto e otimizado** para você ter o **DeepSeek Reasoner** (o melhor modelo atual para código React/TS/Next.js/Tailwind) rodando no Zed em menos de 15 minutos.
