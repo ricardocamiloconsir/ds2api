@@ -180,4 +180,194 @@ Usuário: `admin` | Senha: o que você colocou em `DS2API_ADMIN_KEY`
 
 Pronto! Você agora tem uma das melhores stacks de desenvolvimento do planeta: **DS2API + DeepSeek Reasoner + Zed**.
 
-Qualquer dúvida durante a instalação, cola o erro aqui que resolvemos em 2 minutos.
+---
+
+✅ **Tutorial Completo: Deploy do DS2API no Vercel (Sempre Online – Fevereiro 2026)**
+
+Perfeito! Agora você vai ter o **DS2API rodando 24/7 de graça** (plano Hobby do Vercel), acessível de **qualquer lugar do mundo** — notebook, trabalho, celular, Zed, VS Code, Trae.ai, Cursor, etc. Sem Docker local, sem máquina ligada.
+
+Este tutorial está **100% atualizado** com o repositório oficial (commit de 22/fev/2026).
+
+### Vantagens deste deploy
+- Gratuito (Hobby)
+- Streaming ultra-rápido (SSE real-time)
+- Escalável automático
+- Painel Admin completo
+- Atualização com 1 clique
+- Híbrido Go + Node (melhor performance possível no Vercel)
+
+---
+
+### Pré-requisitos
+- Conta no GitHub
+- Conta no [Vercel.com](https://vercel.com) (faça login com GitHub)
+- Pelo menos 1 conta DeepSeek (recomendo 2 ou 3 para rodízio)
+- Terminal (para gerar Base64)
+
+---
+
+### Passo 1: Fork do Repositório
+
+1. Acesse → [https://github.com/CJackHwang/ds2api](https://github.com/CJackHwang/ds2api)
+2. Clique no botão **Fork** (canto superior direito)
+3. Escolha sua conta pessoal e faça o fork
+
+---
+
+### Passo 2: Preparar o config.json (Localmente)
+
+```bash
+git clone https://github.com/SEU-USUARIO/ds2api.git
+cd ds2api
+cp config.example.json config.json
+```
+
+Abra o `config.json` no Zed ou VS Code e configure:
+
+```json
+{
+  "keys": ["sk-sua-chave-zed-2026-super-secreta"],
+  "accounts": [
+    {
+      "email": "conta1@gmail.com",
+      "password": "sua-senha-real",
+      "token": ""
+    },
+    {
+      "email": "conta2@gmail.com",
+      "password": "sua-senha-real",
+      "token": ""
+    }
+  ],
+  "model_aliases": {
+    "gpt-4o": "deepseek-chat",
+    "claude-4": "deepseek-reasoner",
+    "o3": "deepseek-reasoner",
+    "gpt-5": "deepseek-reasoner"
+  },
+  "runtime": {
+    "account_max_inflight": 3,
+    "account_max_queue": 10
+  }
+}
+```
+
+---
+
+### Passo 3: Gerar o Base64 (DS2API_CONFIG_JSON)
+
+**Mac / Linux:**
+```bash
+base64 < config.json | tr -d '\n'
+```
+
+**Windows (PowerShell):**
+```powershell
+[Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes((Get-Content -Raw -Path "config.json")))
+```
+
+Copie **toda a linha gigante** gerada (Ctrl+C).
+
+---
+
+### Passo 4: Criar o Projeto no Vercel
+
+1. Acesse [https://vercel.com/new](https://vercel.com/new)
+2. Clique em **Import** → selecione seu fork (`SEU-USUARIO/ds2api`)
+3. **Não clique em Deploy ainda** → clique em **"Configure Project"** ou em "Environment Variables"
+
+---
+
+### Passo 5: Configurar Environment Variables
+
+Adicione estas variáveis (clique em "Add" para cada uma):
+
+| Variável                        | Valor                                      | Tipo      |
+|--------------------------------|--------------------------------------------|-----------|
+| `DS2API_ADMIN_KEY`             | `senha-muito-forte-2026!` (crie uma forte) | Obrigatório |
+| `DS2API_CONFIG_JSON`           | Cole aqui o Base64 inteiro                 | Altamente recomendado |
+| `DS2API_VERCEL_INTERNAL_SECRET`| Mesma senha do ADMIN_KEY                   | Recomendado |
+
+Opcional (para sincronização futura):
+- `VERCEL_TOKEN` → crie em vercel.com/account/tokens
+- `VERCEL_PROJECT_ID` → copie do projeto (Settings → General)
+- `VERCEL_TEAM_ID` → se for team
+
+Depois de adicionar todas, clique em **Deploy**.
+
+---
+
+### Passo 6: Aguardar o Deploy
+
+- Tempo médio: 2 a 4 minutos (Vercel compila o WebUI React automaticamente)
+- Quando aparecer **"Ready"** em verde, clique no link do seu domínio:
+  - Exemplo: `https://ds2api-seunome.vercel.app`
+
+---
+
+### Passo 7: Testar Tudo
+
+1. **Teste básico da API**  
+   Abra no navegador:  
+   `https://seu-domínio.vercel.app/v1/models`  
+   Deve mostrar JSON com os modelos do DeepSeek.
+
+2. **Acessar o Painel Admin**  
+   `https://seu-domínio.vercel.app/admin`  
+   - Usuário: `admin`  
+   - Senha: a que você colocou em `DS2API_ADMIN_KEY`
+
+3. **Teste de streaming** (importante)  
+   Use no Zed ou Continue.dev e veja se o texto vem fluindo em tempo real.
+
+---
+
+### Passo 8: Configurar no Zed e VS Code (Continue.dev)
+
+**Base URL:**  
+`https://seu-domínio.vercel.app/v1`
+
+Use exatamente a mesma `apiKey` que você colocou em `"keys"` no config.json.
+
+Exemplo no settings do Zed:
+```json
+"api_url": "https://seu-domínio.vercel.app/v1"
+```
+
+---
+
+### Como Atualizar a Configuração Depois (Sem Redeploy)
+
+1. Acesse o painel `/admin`
+2. Vá em **Settings** → edite o que quiser
+3. Clique em **"Sync to Vercel"** (se você configurou VERCEL_TOKEN + PROJECT_ID)
+   → O Vercel atualiza automaticamente a variável `DS2API_CONFIG_JSON`
+
+---
+
+### Dicas de Segurança & Melhores Práticas
+
+- Use uma senha **muito forte** no `DS2API_ADMIN_KEY`
+- Nunca compartilhe o link do Admin publicamente
+- Se quiser mais proteção: ative **Vercel Deployment Protection** + Custom Domain
+- Recomendado: 2~4 contas DeepSeek para nunca bater limite
+
+---
+
+### Troubleshooting (Problemas Comuns)
+
+| Problema                          | Solução |
+|-----------------------------------|--------|
+| Build falhando (Go)               | No Vercel → Redeploy → "Clear Cache and Redeploy" |
+| Streaming lento ou quebrado       | Certifique-se que `api/chat-stream.js` existe no repo |
+| Página de "Authentication Required" | Project Settings → Security → desative Deployment Protection |
+| 401 Unauthorized                  | Chave no Zed/Continue diferente da do config |
+| WebUI em branco                   | Espere o primeiro deploy terminar (compila React) |
+
+---
+
+**Pronto!**  
+Você agora tem um DS2API **público, seguro e sempre online** com DeepSeek Reasoner rodando em qualquer ferramenta.
+
+Seu domínio final vai ser algo como `https://ds2api-seunome.vercel.app/v1`
+
