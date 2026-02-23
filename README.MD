@@ -263,7 +263,11 @@ base64 < config.json | tr -d '\n'
 
 **Windows (PowerShell):**
 ```powershell
-[Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes((Get-Content -Raw -Path "config.json")))
+$json = Get-Content -Raw -Encoding UTF8 -Path "config.json" | Out-String
+$bytes = [System.Text.Encoding]::UTF8.GetBytes($json.Trim())
+$base64 = [Convert]::ToBase64String($bytes)
+$base64 | Set-Clipboard
+Write-Host "✅ Base64 copiado para a área de transferência! Cole direto no Vercel." -ForegroundColor Green
 ```
 
 Copie **toda a linha gigante** gerada (Ctrl+C).
