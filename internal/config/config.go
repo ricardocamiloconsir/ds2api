@@ -1,7 +1,10 @@
 package config
 
+import "time"
+
 type Config struct {
 	Keys             []string          `json:"keys,omitempty"`
+	APIKeys          []APIKeyMetadata  `json:"api_keys,omitempty"`
 	Accounts         []Account         `json:"accounts,omitempty"`
 	ClaudeMapping    map[string]string `json:"claude_mapping,omitempty"`
 	ClaudeModelMap   map[string]string `json:"claude_model_mapping,omitempty"`
@@ -15,6 +18,13 @@ type Config struct {
 	VercelSyncHash   string            `json:"_vercel_sync_hash,omitempty"`
 	VercelSyncTime   int64             `json:"_vercel_sync_time,omitempty"`
 	AdditionalFields map[string]any    `json:"-"`
+}
+
+type APIKeyMetadata struct {
+	ID        string    `json:"id"`
+	Key       string    `json:"key"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 type Account struct {

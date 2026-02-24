@@ -673,6 +673,118 @@ Exports full config in three forms: `config`, `json`, and `base64`.
 
 **Response**: `{"success": true, "total_keys": 2}`
 
+### `GET /admin/keys/metadata`
+
+Returns metadata for all API keys (including expiration time).
+
+**Response**:
+```json
+[
+  {
+    "id": "apikey:abc123...",
+    "key": "sk-test-key-****",
+    "created_at": "2026-01-23T00:00:00Z",
+    "expires_at": "2026-02-22T00:00:00Z"
+  }
+]
+```
+
+### `GET /admin/keys/expiring`
+
+Query API keys expiring soon (default: within 7 days).
+
+**Query params**:
+| Param | Default | Description |
+| --- | --- | --- |
+| `days` | `7` | Warning days ahead |
+
+**Response**:
+```json
+[
+  {
+    "id": "apikey:abc123...",
+    "key": "sk-expiring-key-****",
+    "created_at": "2026-01-23T00:00:00Z",
+    "expires_at": "2026-02-22T00:00:00Z"
+  }
+]
+```
+
+### `GET /admin/keys/expired`
+
+Query expired API keys.
+
+**Response**:
+```json
+[
+  {
+    "id": "apikey:abc123...",
+    "key": "sk-expired-key-****",
+    "created_at": "2025-12-24T00:00:00Z",
+    "expires_at": "2026-01-23T00:00:00Z"
+  }
+]
+```
+
+### `GET /admin/notifications`
+
+Get notification history.
+
+**Response**:
+```json
+[
+  {
+    "type": "warning",
+    "api_key": "sk-test-****",
+    "message": "API key expiring soon",
+    "expires_at": "2026-02-22T00:00:00Z",
+    "timestamp": "2026-02-15T00:00:00Z"
+  }
+]
+```
+
+### `GET /admin/notifications/stream`
+
+Establish SSE connection for real-time notifications.
+
+**Event format**:
+```text
+data: {"type":"warning","api_key":"sk-test-****","message":"API key expiring soon","expires_at":"2026-02-22T00:00:00Z","timestamp":"2026-02-15T00:00:00Z"}
+```
+
+### `GET /admin/monitor/status`
+
+Get monitoring service status.
+
+**Response**:
+```json
+{
+  "running": true,
+  "check_interval": "24h0m0s",
+  "warning_days": 7,
+  "total_keys": 5,
+  "expiring_keys": 2,
+  "expired_keys": 1,
+  "valid_keys": 4
+}
+```
+
+### `PUT /admin/monitor/settings`
+
+Update monitoring settings.
+
+**Request**:
+```json
+{
+  "check_interval": "12h",
+  "warning_days": 14
+}
+```
+
+### `POST /admin/monitor/check`
+
+Trigger an immediate check.
+
 ### `GET /admin/accounts`
 
 **Query params**:

@@ -136,6 +136,23 @@
         "updateAccountLoading": "更新中...",
         "pageInfo": "第 {current}/{total} 页，共 {count} 个账号"
     },
+    "apiKey": {
+        "expiryTitle": "API 密钥过期",
+        "expiryDesc": "监控和管理 API 密钥过期（30天有效期）",
+        "valid": "有效",
+        "expiringSoon": "即将过期",
+        "expired": "已过期",
+        "expiresAt": "过期时间",
+        "expiresIn": "剩余",
+        "expiredOn": "过期于",
+        "days": "天",
+        "validKeys": "有效密钥",
+        "expiringKeys": "即将过期密钥",
+        "expiredKeys": "已过期密钥",
+        "noApiKeys": "未找到 API 密钥",
+        "checkNow": "立即检查",
+        "expiredAdvice": "过期的密钥无法使用。请生成新密钥以继续使用 API。"
+    },
     "apiTester": {
         "defaultMessage": "你好，请用一句话介绍你自己。",
         "models": {

@@ -9,19 +9,20 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"ds2api/internal/config"
+	"ds2api/internal/errors"
 )
 
 func (h *Handler) listAccounts(w http.ResponseWriter, r *http.Request) {
 	page := intFromQuery(r, "page", 1)
-	pageSize := intFromQuery(r, "page_size", 10)
+	pageSize := intFromQuery(r, "page_size", config.DefaultPageSize)
 	if page < 1 {
 		page = 1
 	}
 	if pageSize < 1 {
 		pageSize = 1
 	}
-	if pageSize > 100 {
-		pageSize = 100
+	if pageSize > config.MaxPageSize {
+		pageSize = config.MaxPageSize
 	}
 	accounts := h.Store.Snapshot().Accounts
 	total := len(accounts)
@@ -70,23 +71,23 @@ func (h *Handler) addAccount(w http.ResponseWriter, r *http.Request) {
 
 	acc := toAccount(req)
 	if acc.Identifier() == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "需要 email 或 mobile"})
+		errors.WriteErrorResponse(w, errors.ErrInvalidRequest)
 		return
 	}
 	err := h.Store.Update(func(c *config.Config) error {
 		for _, a := range c.Accounts {
 			if acc.Email != "" && a.Email == acc.Email {
-				return fmt.Errorf("邮箱已存在")
+				return errors.ErrAccountExists
 			}
 			if acc.Mobile != "" && a.Mobile == acc.Mobile {
-				return fmt.Errorf("手机号已存在")
+				return errors.ErrMobileExists
 			}
 		}
 		c.Accounts = append(c.Accounts, acc)
 		return nil
 	})
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
+		errors.WriteErrorResponse(w, err)
 		return
 	}
 	h.Pool.Reset()
@@ -106,7 +107,7 @@ func (h *Handler) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		}
 		if idx < 0 {
 			fmt.Printf("[DELETE] Account not found: %s\n", identifier)
-			return fmt.Errorf("账号不存在")
+			return errors.ErrAccountNotFound
 		}
 		fmt.Printf("[DELETE] Deleting account at index %d\n", idx)
 		c.Accounts = append(c.Accounts[:idx], c.Accounts[idx+1:]...)
@@ -114,7 +115,7 @@ func (h *Handler) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		fmt.Printf("[DELETE] Error: %v\n", err)
-		writeJSON(w, http.StatusNotFound, map[string]any{"detail": err.Error()})
+		errors.WriteErrorResponse(w, err)
 		return
 	}
 	h.Pool.Reset()
@@ -142,7 +143,7 @@ func (h *Handler) updateAccount(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if idx < 0 {
-			return fmt.Errorf("账号不存在")
+			return errors.ErrAccountNotFound
 		}
 
 		fmt.Printf("[UPDATE] Before update: email='%s', password_len=%d\n", c.Accounts[idx].Email, len(c.Accounts[idx].Password))
@@ -166,7 +167,7 @@ func (h *Handler) updateAccount(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		writeJSON(w, http.StatusNotFound, map[string]any{"detail": err.Error()})
+		errors.WriteErrorResponse(w, err)
 		return
 	}
 	h.Pool.Reset()

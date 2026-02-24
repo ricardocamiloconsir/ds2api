@@ -18,6 +18,7 @@ import (
 	"ds2api/internal/auth"
 	"ds2api/internal/config"
 	"ds2api/internal/deepseek"
+	"ds2api/internal/monitor"
 	"ds2api/internal/webui"
 )
 
@@ -43,19 +44,34 @@ func NewApp() *App {
 		config.Logger.Info("[WASM] module preloaded", "path", config.WASMPath())
 	}
 
+	apiKeyManager := config.NewAPIKeyManager(store)
+	notifier := monitor.NewNotifier()
+	monitorService := monitor.NewMonitor(store, apiKeyManager, notifier)
+
+	go monitorService.Start(context.Background())
+
 	openaiHandler := &openai.Handler{Store: store, Auth: resolver, DS: dsClient}
 	claudeHandler := &claude.Handler{Store: store, Auth: resolver, DS: dsClient}
 	geminiHandler := &gemini.Handler{Store: store, Auth: resolver, DS: dsClient}
-	adminHandler := &admin.Handler{Store: store, Pool: pool, DS: dsClient}
+	adminHandler := &admin.Handler{
+		Store:         store,
+		Pool:          pool,
+		DS:            dsClient,
+		APIKeyManager: apiKeyManager,
+		Monitor:       monitorService,
+		Notifier:      notifier,
+	}
 	webuiHandler := webui.NewHandler()
+	metrics := newRequestMetrics()
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
+	r.Use(accessLogMiddleware)
 	r.Use(middleware.Recoverer)
 	r.Use(cors)
 	r.Use(timeout(0))
+	r.Use(metrics.middleware)
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -63,9 +79,18 @@ func NewApp() *App {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 	r.Get("/readyz", func(w http.ResponseWriter, _ *http.Request) {
+		if len(store.Accounts()) == 0 {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"status":"not_ready","reason":"no_accounts"}`))
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ready"}`))
+		_, _ = w.Write([]byte(`{"status":"ready","accounts":true}`))
+	})
+	r.Get("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		metrics.handleMetrics(w, r, pool.Status())
 	})
 	openai.RegisterRoutes(r, openaiHandler)
 	claude.RegisterRoutes(r, claudeHandler)

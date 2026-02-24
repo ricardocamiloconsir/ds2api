@@ -18,7 +18,7 @@ const authCtxKey ctxKey = "auth_context"
 
 var (
 	ErrUnauthorized = errors.New("unauthorized: missing auth token")
-	ErrNoAccount    = errors.New("no accounts configured or all accounts are busy")
+	ErrNoAccount   = errors.New("no accounts configured or all accounts are busy")
 )
 
 type RequestAuth struct {
@@ -48,9 +48,10 @@ func (r *Resolver) Determine(req *http.Request) (*RequestAuth, error) {
 	if callerKey == "" {
 		return nil, ErrUnauthorized
 	}
+
 	callerID := callerTokenID(callerKey)
 	ctx := req.Context()
-	if !r.Store.HasAPIKey(callerKey) {
+	if !r.Store.HasValidAPIKey(callerKey) {
 		return &RequestAuth{
 			UseConfigToken: false,
 			DeepSeekToken:  callerKey,
@@ -59,6 +60,7 @@ func (r *Resolver) Determine(req *http.Request) (*RequestAuth, error) {
 			TriedAccounts:  map[string]bool{},
 		}, nil
 	}
+
 	target := strings.TrimSpace(req.Header.Get("X-Ds2-Target-Account"))
 	acc, ok := r.Pool.AcquireWait(ctx, target, nil)
 	if !ok {
@@ -97,7 +99,7 @@ func (r *Resolver) DetermineCaller(req *http.Request) (*RequestAuth, error) {
 		resolver:       r,
 		TriedAccounts:  map[string]bool{},
 	}
-	if r == nil || r.Store == nil || !r.Store.HasAPIKey(callerKey) {
+	if r == nil || r.Store == nil || !r.Store.HasValidAPIKey(callerKey) {
 		a.DeepSeekToken = callerKey
 	}
 	return a, nil

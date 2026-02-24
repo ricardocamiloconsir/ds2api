@@ -673,6 +673,118 @@ data: {"type":"message_stop"}
 
 **响应**：`{"success": true, "total_keys": 2}`
 
+### `GET /admin/keys/metadata`
+
+返回所有 API key 的元数据（包括过期时间）。
+
+**响应**：
+```json
+[
+  {
+    "id": "apikey:abc123...",
+    "key": "sk-test-key-****",
+    "created_at": "2026-01-23T00:00:00Z",
+    "expires_at": "2026-02-22T00:00:00Z"
+  }
+]
+```
+
+### `GET /admin/keys/expiring`
+
+查询即将过期的 API key（默认 7 天内）。
+
+**查询参数**：
+| 参数 | 默认 | 说明 |
+| --- | --- | --- |
+| `days` | `7` | 提前告警天数 |
+
+**响应**：
+```json
+[
+  {
+    "id": "apikey:abc123...",
+    "key": "sk-expiring-key-****",
+    "created_at": "2026-01-23T00:00:00Z",
+    "expires_at": "2026-02-22T00:00:00Z"
+  }
+]
+```
+
+### `GET /admin/keys/expired`
+
+查询已过期的 API key。
+
+**响应**：
+```json
+[
+  {
+    "id": "apikey:abc123...",
+    "key": "sk-expired-key-****",
+    "created_at": "2025-12-24T00:00:00Z",
+    "expires_at": "2026-01-23T00:00:00Z"
+  }
+]
+```
+
+### `GET /admin/notifications`
+
+获取历史通知记录。
+
+**响应**：
+```json
+[
+  {
+    "type": "warning",
+    "api_key": "sk-test-****",
+    "message": "API key expiring soon",
+    "expires_at": "2026-02-22T00:00:00Z",
+    "timestamp": "2026-02-15T00:00:00Z"
+  }
+]
+```
+
+### `GET /admin/notifications/stream`
+
+建立 SSE 连接，实时接收通知。
+
+**事件格式**：
+```text
+data: {"type":"warning","api_key":"sk-test-****","message":"API key expiring soon","expires_at":"2026-02-22T00:00:00Z","timestamp":"2026-02-15T00:00:00Z"}
+```
+
+### `GET /admin/monitor/status`
+
+获取监控服务状态。
+
+**响应**：
+```json
+{
+  "running": true,
+  "check_interval": "24h0m0s",
+  "warning_days": 7,
+  "total_keys": 5,
+  "expiring_keys": 2,
+  "expired_keys": 1,
+  "valid_keys": 4
+}
+```
+
+### `PUT /admin/monitor/settings`
+
+更新监控设置。
+
+**请求**：
+```json
+{
+  "check_interval": "12h",
+  "warning_days": 14
+}
+```
+
+### `POST /admin/monitor/check`
+
+手动触发一次立即检查。
+
 ### `GET /admin/accounts`
 
 **查询参数**：
