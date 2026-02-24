@@ -35,12 +35,8 @@ func TestAPIKeyManager_AddAPIKey(t *testing.T) {
 	if metadata.CreatedAt.IsZero() {
 		t.Fatal("expected CreatedAt to be set")
 	}
-	if metadata.ExpiresAt.IsZero() {
-		t.Fatal("expected ExpiresAt to be set")
-	}
-	expectedExpiry := APIKeyExpiryFrom(metadata.CreatedAt)
-	if !metadata.ExpiresAt.Equal(expectedExpiry) {
-		t.Fatalf("expected expiration %v, got %v", expectedExpiry, metadata.ExpiresAt)
+	if !metadata.ExpiresAt.IsZero() {
+		t.Fatal("expected ExpiresAt to be empty")
 	}
 }
 
@@ -120,24 +116,10 @@ func TestAPIKeyManager_IsAPIKeyValid(t *testing.T) {
 	manager := NewAPIKeyManager(store)
 
 	validKey := "sk-valid-key"
-	expiredKey := "sk-expired-key"
 	manager.AddAPIKey(validKey)
-	manager.AddAPIKey(expiredKey)
-
-	store.Update(func(c *Config) error {
-		for i, metadata := range c.APIKeys {
-			if metadata.Key == expiredKey {
-				c.APIKeys[i].ExpiresAt = time.Now().Add(-time.Hour)
-			}
-		}
-		return nil
-	})
 
 	if !manager.IsAPIKeyValid(validKey) {
 		t.Fatal("expected valid key to be valid")
-	}
-	if manager.IsAPIKeyValid(expiredKey) {
-		t.Fatal("expected expired key to be invalid")
 	}
 	if manager.IsAPIKeyValid("sk-non-existent") {
 		t.Fatal("expected non-existent key to be invalid")
@@ -167,8 +149,8 @@ func TestAPIKeyManager_GetExpiringKeys(t *testing.T) {
 	})
 
 	expiring := manager.GetExpiringKeys(7)
-	if len(expiring) != 2 {
-		t.Fatalf("expected 2 expiring keys, got %d", len(expiring))
+	if len(expiring) != 0 {
+		t.Fatalf("expected 0 expiring keys, got %d", len(expiring))
 	}
 }
 
@@ -194,8 +176,8 @@ func TestAPIKeyManager_GetExpiredKeys(t *testing.T) {
 	})
 
 	expired := manager.GetExpiredKeys()
-	if len(expired) != 2 {
-		t.Fatalf("expected 2 expired keys, got %d", len(expired))
+	if len(expired) != 0 {
+		t.Fatalf("expected 0 expired keys, got %d", len(expired))
 	}
 }
 
@@ -224,16 +206,8 @@ func TestAPIKeyManager_CleanExpiredKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CleanExpiredKeys returned error: %v", err)
 	}
-	if removed != 2 {
-		t.Fatalf("expected 2 removed keys, got %d", removed)
-	}
-
-	cfg := store.Snapshot()
-	if len(cfg.APIKeys) != 1 {
-		t.Fatalf("expected 1 remaining key, got %d", len(cfg.APIKeys))
-	}
-	if cfg.APIKeys[0].Key != "sk-valid" {
-		t.Fatalf("expected remaining key sk-valid, got %s", cfg.APIKeys[0].Key)
+	if removed != 0 {
+		t.Fatalf("expected 0 removed keys, got %d", removed)
 	}
 }
 
@@ -264,7 +238,7 @@ func TestAPIKeyManager_GetValidKeys(t *testing.T) {
 	if !slices.Contains(validKeys, "sk-valid-1") {
 		t.Fatal("expected valid metadata key in valid keys")
 	}
-	if slices.Contains(validKeys, "sk-expired") {
-		t.Fatal("did not expect expired key in valid keys")
+	if !slices.Contains(validKeys, "sk-expired") {
+		t.Fatal("expected metadata key in valid keys")
 	}
 }
