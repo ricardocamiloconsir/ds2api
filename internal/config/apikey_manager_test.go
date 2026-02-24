@@ -38,8 +38,9 @@ func TestAPIKeyManager_AddAPIKey(t *testing.T) {
 	if metadata.ExpiresAt.IsZero() {
 		t.Fatal("expected ExpiresAt to be set")
 	}
-	if metadata.ExpiresAt.Sub(metadata.CreatedAt) != APIKeyTTL {
-		t.Fatalf("expected expiration delta %v, got %v", APIKeyTTL, metadata.ExpiresAt.Sub(metadata.CreatedAt))
+	expectedExpiry := APIKeyExpiryFrom(metadata.CreatedAt)
+	if !metadata.ExpiresAt.Equal(expectedExpiry) {
+		t.Fatalf("expected expiration %v, got %v", expectedExpiry, metadata.ExpiresAt)
 	}
 }
 

@@ -140,7 +140,7 @@ func (s *Store) HasValidAPIKey(k string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if metadata, found := s.findAPIKeyMetadataLocked(k); found {
-		return time.Now().Before(metadata.ExpiresAt)
+		return IsAPIKeyActiveAt(metadata, time.Now())
 	}
 	_, ok := s.keyMap[k]
 	return ok
@@ -150,7 +150,8 @@ func (s *Store) IsAPIKeyExpired(k string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if metadata, found := s.findAPIKeyMetadataLocked(k); found {
-		return time.Now().After(metadata.ExpiresAt)
+		expiry := ResolveAPIKeyExpiry(metadata)
+		return !expiry.IsZero() && time.Now().After(expiry)
 	}
 	return false
 }
