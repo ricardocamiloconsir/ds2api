@@ -41,6 +41,8 @@ export default function AccountManagerContainer({ config, onRefresh, onMessage, 
         editingAccount,
         setEditingAccount,
         loading,
+        addKeyError,
+        setAddKeyError,
         testing,
         testingAll,
         batchProgress,
@@ -71,7 +73,10 @@ export default function AccountManagerContainer({ config, onRefresh, onMessage, 
                 config={config}
                 keysExpanded={keysExpanded}
                 setKeysExpanded={setKeysExpanded}
-                setShowAddKey={setShowAddKey}
+                setShowAddKey={(show) => {
+                    setShowAddKey(show)
+                    if (show) setAddKeyError('')
+                }}
                 copiedKey={copiedKey}
                 setCopiedKey={setCopiedKey}
                 onDeleteKey={deleteKey}
@@ -103,7 +108,12 @@ export default function AccountManagerContainer({ config, onRefresh, onMessage, 
                 newKey={newKey}
                 setNewKey={setNewKey}
                 loading={loading}
-                onClose={() => setShowAddKey(false)}
+                errorMessage={addKeyError}
+                onClose={() => {
+                    if (loading) return
+                    setShowAddKey(false)
+                    setAddKeyError('')
+                }}
                 onAdd={addKey}
             />
 

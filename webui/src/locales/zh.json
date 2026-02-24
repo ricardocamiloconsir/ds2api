@@ -134,7 +134,9 @@
         "editAccountTitle": "编辑 DeepSeek 账号",
         "updateAccountAction": "更新账号",
         "updateAccountLoading": "更新中...",
-        "pageInfo": "第 {current}/{total} 页，共 {count} 个账号"
+        "pageInfo": "第 {current}/{total} 页，共 {count} 个账号",
+        "keyRequired": "API Key 为必填项。",
+        "keyPersistValidationFailed": "密钥创建后持久化校验失败，请刷新后重试。"
     },
     "apiKey": {
         "expiryTitle": "API 密钥过期",

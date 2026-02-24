@@ -134,7 +134,9 @@
         "editAccountTitle": "Edit DeepSeek account",
         "updateAccountAction": "Update account",
         "updateAccountLoading": "Updating...",
-        "pageInfo": "Page {current}/{total}, {count} accounts total"
+        "pageInfo": "Page {current}/{total}, {count} accounts total",
+        "keyRequired": "API key is required.",
+        "keyPersistValidationFailed": "The key was created but persistence validation failed. Please refresh and try again."
     },
     "apiKey": {
         "expiryTitle": "API Key Expiration",
