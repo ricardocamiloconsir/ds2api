@@ -1,6 +1,6 @@
 import { Check, ChevronDown, Copy, Plus, Trash2, Clock, AlertTriangle, AlertCircle } from 'lucide-react'
 import clsx from 'clsx'
-import { calculateDaysUntilExpiry, EXPIRY_THRESHOLDS } from '../../utils/apiKeyUtils'
+import { getKeyExpiryStatusFromMetadata } from '../../utils/apiKeyUtils'
 
 export default function ApiKeysPanel({
     t,
@@ -15,16 +15,7 @@ export default function ApiKeysPanel({
 }) {
     const getKeyExpiryStatus = (key) => {
         const metadata = apiKeysMetadata.find(m => m.key === key)
-        if (!metadata) return { status: 'valid', daysLeft: null }
-
-        const daysLeft = calculateDaysUntilExpiry(metadata.expires_at)
-
-        if (daysLeft <= EXPIRY_THRESHOLDS.CRITICAL) {
-            return { status: 'expired', daysLeft }
-        } else if (daysLeft <= EXPIRY_THRESHOLDS.WARNING) {
-            return { status: 'expiring', daysLeft }
-        }
-        return { status: 'valid', daysLeft }
+        return getKeyExpiryStatusFromMetadata(metadata)
     }
 
     return (

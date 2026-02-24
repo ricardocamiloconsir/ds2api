@@ -173,6 +173,23 @@ func (m *APIKeyManager) GetValidKeys() []string {
 	return validKeys
 }
 
+func (m *APIKeyManager) GetValidAPIKeys() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	cfg := m.store.Snapshot()
+	now := time.Now()
+	validKeys := make([]string, 0, len(cfg.APIKeys))
+
+	for _, metadata := range cfg.APIKeys {
+		if metadata.ExpiresAt.After(now) {
+			validKeys = append(validKeys, metadata.Key)
+		}
+	}
+
+	return validKeys
+}
+
 func generateAPIKeyID(key string) string {
 	sum := sha256.Sum256([]byte(key))
 	return "apikey:" + hex.EncodeToString(sum[:8])

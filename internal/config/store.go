@@ -34,12 +34,22 @@ func LoadStore() *Store {
 		backupPath := ConfigPath() + ".backup." + time.Now().Format("20060102-150405")
 		if err := BackupConfig(ConfigPath()); err != nil {
 			Logger.Warn("[config] backup failed", "error", err)
+			Logger.Warn("[config] aborting migration due to backup failure")
 		} else {
 			Logger.Info("[config] config backed up", "path", backupPath)
-		}
 
-		if err := SaveConfig(&cfg); err != nil {
-			Logger.Warn("[config] failed to save migrated config", "error", err)
+			if err := SaveConfig(&cfg); err != nil {
+				Logger.Error("[config] failed to save migrated config", "error", err)
+				Logger.Warn("[config] restoring from backup due to save failure")
+				restoreErr := RestoreConfig(backupPath, ConfigPath())
+				if restoreErr != nil {
+					Logger.Error("[config] failed to restore from backup", "error", restoreErr)
+				} else {
+					Logger.Info("[config] config restored from backup")
+				}
+			} else {
+				Logger.Info("[config] migration completed successfully")
+			}
 		}
 	}
 
@@ -100,10 +110,8 @@ func (s *Store) HasAPIKey(k string) bool {
 	if ok {
 		return true
 	}
-	if metadata, found := s.findAPIKeyMetadataLocked(k, &s.cfg); found {
-		return time.Now().Before(metadata.ExpiresAt)
-	}
-	return false
+	_, found := s.findAPIKeyMetadataLocked(k, &s.cfg)
+	return found
 }
 
 func (s *Store) HasValidAPIKey(k string) bool {
@@ -115,6 +123,18 @@ func (s *Store) HasValidAPIKey(k string) bool {
 	}
 	if metadata, found := s.findAPIKeyMetadataLocked(k, &s.cfg); found {
 		return time.Now().Before(metadata.ExpiresAt)
+	}
+	return false
+}
+
+func (s *Store) IsAPIKeyExpired(k string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if _, ok := s.keyMap[k]; ok {
+		return false
+	}
+	if metadata, found := s.findAPIKeyMetadataLocked(k, &s.cfg); found {
+		return time.Now().After(metadata.ExpiresAt)
 	}
 	return false
 }

@@ -14,7 +14,7 @@ func MigrateAPIKeysToV2(cfg *Config) bool {
 		return false
 	}
 
-	logger.Info("[migration] migrating API keys from v1 to v2 format")
+	Logger.Info("[migration] migrating API keys from v1 to v2 format")
 
 	now := time.Now()
 	apiKeys := make([]APIKeyMetadata, 0, len(cfg.Keys))
@@ -31,7 +31,7 @@ func MigrateAPIKeysToV2(cfg *Config) bool {
 
 	cfg.APIKeys = apiKeys
 
-	logger.Info("[migration] migration completed", "migrated_keys", len(apiKeys))
+	Logger.Info("[migration] migration completed", "migrated_keys", len(apiKeys))
 
 	return true
 }
@@ -45,4 +45,13 @@ func BackupConfig(filePath string) error {
 	}
 
 	return os.WriteFile(backupPath, data, 0644)
+}
+
+func RestoreConfig(backupPath, targetPath string) error {
+	data, err := os.ReadFile(backupPath)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(targetPath, data, 0644)
 }
