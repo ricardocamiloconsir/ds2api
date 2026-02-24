@@ -8,7 +8,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/refraction-networking/utls v1.8.1
-	github.com/stretchr/testify v1.9.0
 	github.com/tetratelabs/wazero v1.9.0
 )
 
@@ -17,5 +16,3 @@ require (
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 )
-
-replace github.com/stretchr/testify => ./third_party/testify

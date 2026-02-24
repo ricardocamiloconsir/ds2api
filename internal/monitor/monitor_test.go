@@ -2,12 +2,11 @@ package monitor
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"ds2api/internal/config"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestNotifier_Subscribe(t *testing.T) {
@@ -15,7 +14,9 @@ func TestNotifier_Subscribe(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	sub := notifier.Subscribe(ctx)
-	assert.NotNil(t, sub)
+	if sub == nil {
+		t.Fatal("expected subscriber channel to be non-nil")
+	}
 
 	cancel()
 
@@ -39,16 +40,18 @@ func TestNotifier_NotifyExpiring(t *testing.T) {
 
 	sub := notifier.Subscribe(ctx)
 	go func() {
-		keys := []config.APIKeyMetadata{
-			{Key: "sk-expiring-1", ExpiresAt: time.Now().Add(3 * 24 * time.Hour)},
-		}
+		keys := []config.APIKeyMetadata{{Key: "sk-expiring-1", ExpiresAt: time.Now().Add(3 * 24 * time.Hour)}}
 		notifier.notifyExpiring(keys)
 	}()
 
 	select {
 	case notification := <-sub:
-		assert.Equal(t, config.NotificationTypeWarning, notification.Type)
-		assert.Contains(t, notification.APIKey, "****")
+		if notification.Type != config.NotificationTypeWarning {
+			t.Fatalf("expected type %q, got %q", config.NotificationTypeWarning, notification.Type)
+		}
+		if !strings.Contains(notification.APIKey, "****") {
+			t.Fatalf("expected obfuscated API key, got %q", notification.APIKey)
+		}
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("Did not receive notification")
 	}
@@ -61,16 +64,18 @@ func TestNotifier_NotifyExpired(t *testing.T) {
 
 	sub := notifier.Subscribe(ctx)
 	go func() {
-		keys := []config.APIKeyMetadata{
-			{Key: "sk-expired-1", ExpiresAt: time.Now().Add(-time.Hour)},
-		}
+		keys := []config.APIKeyMetadata{{Key: "sk-expired-1", ExpiresAt: time.Now().Add(-time.Hour)}}
 		notifier.notifyExpired(keys)
 	}()
 
 	select {
 	case notification := <-sub:
-		assert.Equal(t, config.NotificationTypeExpired, notification.Type)
-		assert.Contains(t, notification.APIKey, "****")
+		if notification.Type != config.NotificationTypeExpired {
+			t.Fatalf("expected type %q, got %q", config.NotificationTypeExpired, notification.Type)
+		}
+		if !strings.Contains(notification.APIKey, "****") {
+			t.Fatalf("expected obfuscated API key, got %q", notification.APIKey)
+		}
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("Did not receive notification")
 	}
@@ -79,14 +84,16 @@ func TestNotifier_NotifyExpired(t *testing.T) {
 func TestNotifier_GetHistory(t *testing.T) {
 	notifier := NewNotifier()
 
-	keys := []config.APIKeyMetadata{
-		{Key: "sk-expiring-1", ExpiresAt: time.Now().Add(3 * 24 * time.Hour)},
-	}
+	keys := []config.APIKeyMetadata{{Key: "sk-expiring-1", ExpiresAt: time.Now().Add(3 * 24 * time.Hour)}}
 	notifier.notifyExpiring(keys)
 
 	history := notifier.GetHistory()
-	assert.Equal(t, 1, len(history))
-	assert.Equal(t, config.NotificationTypeWarning, history[0].Type)
+	if len(history) != 1 {
+		t.Fatalf("expected history len 1, got %d", len(history))
+	}
+	if history[0].Type != config.NotificationTypeWarning {
+		t.Fatalf("expected history notification type %q, got %q", config.NotificationTypeWarning, history[0].Type)
+	}
 }
 
 func TestMonitor_GetStatus(t *testing.T) {
@@ -102,9 +109,15 @@ func TestMonitor_GetStatus(t *testing.T) {
 	monitor := NewMonitor(store, apiKeyManager, notifier)
 
 	status := monitor.GetStatus()
-	assert.Equal(t, false, status["running"])
-	assert.Equal(t, config.DefaultWarningDays, status["warning_days"])
-	assert.Equal(t, config.DefaultCheckInterval.String(), status["check_interval"])
+	if status["running"] != false {
+		t.Fatalf("expected running false, got %#v", status["running"])
+	}
+	if status["warning_days"] != config.DefaultWarningDays {
+		t.Fatalf("expected warning_days %d, got %#v", config.DefaultWarningDays, status["warning_days"])
+	}
+	if status["check_interval"] != config.DefaultCheckInterval.String() {
+		t.Fatalf("expected check_interval %q, got %#v", config.DefaultCheckInterval.String(), status["check_interval"])
+	}
 }
 
 func TestMonitor_CheckExpirations(t *testing.T) {
@@ -133,7 +146,9 @@ func TestMonitor_CheckExpirations(t *testing.T) {
 	monitor.CheckNow()
 
 	history := notifier.GetHistory()
-	assert.GreaterOrEqual(t, len(history), 2)
+	if len(history) < 2 {
+		t.Fatalf("expected at least 2 notifications, got %d", len(history))
+	}
 }
 
 func TestMonitor_SetWarningDays(t *testing.T) {
@@ -145,7 +160,9 @@ func TestMonitor_SetWarningDays(t *testing.T) {
 	monitor.SetWarningDays(14)
 
 	status := monitor.GetStatus()
-	assert.Equal(t, 14, status["warning_days"])
+	if status["warning_days"] != 14 {
+		t.Fatalf("expected warning_days 14, got %#v", status["warning_days"])
+	}
 }
 
 func TestMonitor_SetCheckInterval(t *testing.T) {
@@ -158,5 +175,7 @@ func TestMonitor_SetCheckInterval(t *testing.T) {
 	monitor.SetCheckInterval(interval)
 
 	status := monitor.GetStatus()
-	assert.Equal(t, interval.String(), status["check_interval"])
+	if status["check_interval"] != interval.String() {
+		t.Fatalf("expected check_interval %q, got %#v", interval.String(), status["check_interval"])
+	}
 }

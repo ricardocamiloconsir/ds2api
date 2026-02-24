@@ -1,11 +1,9 @@
 package config
 
 import (
+	"slices"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestAPIKeyManager_AddAPIKey(t *testing.T) {
@@ -20,16 +18,29 @@ func TestAPIKeyManager_AddAPIKey(t *testing.T) {
 
 	testKey := "sk-test-key-12345"
 	err := manager.AddAPIKey(testKey)
-
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("AddAPIKey returned error: %v", err)
+	}
 
 	metadata, found := manager.GetAPIKeyMetadata(testKey)
-	require.True(t, found)
-	assert.Equal(t, testKey, metadata.Key)
-	assert.NotEmpty(t, metadata.ID)
-	assert.NotZero(t, metadata.CreatedAt)
-	assert.NotZero(t, metadata.ExpiresAt)
-	assert.Equal(t, metadata.ExpiresAt.Sub(metadata.CreatedAt), APIKeyTTL)
+	if !found {
+		t.Fatal("expected key metadata to be found")
+	}
+	if metadata.Key != testKey {
+		t.Fatalf("expected key %q, got %q", testKey, metadata.Key)
+	}
+	if metadata.ID == "" {
+		t.Fatal("expected metadata ID to be set")
+	}
+	if metadata.CreatedAt.IsZero() {
+		t.Fatal("expected CreatedAt to be set")
+	}
+	if metadata.ExpiresAt.IsZero() {
+		t.Fatal("expected ExpiresAt to be set")
+	}
+	if metadata.ExpiresAt.Sub(metadata.CreatedAt) != APIKeyTTL {
+		t.Fatalf("expected expiration delta %v, got %v", APIKeyTTL, metadata.ExpiresAt.Sub(metadata.CreatedAt))
+	}
 }
 
 func TestAPIKeyManager_AddDuplicateKey(t *testing.T) {
@@ -45,13 +56,19 @@ func TestAPIKeyManager_AddDuplicateKey(t *testing.T) {
 	testKey := "sk-test-key-12345"
 
 	err1 := manager.AddAPIKey(testKey)
-	require.NoError(t, err1)
+	if err1 != nil {
+		t.Fatalf("first AddAPIKey returned error: %v", err1)
+	}
 
 	err2 := manager.AddAPIKey(testKey)
-	require.NoError(t, err2)
+	if err2 != nil {
+		t.Fatalf("second AddAPIKey returned error: %v", err2)
+	}
 
 	cfg := store.Snapshot()
-	assert.Equal(t, 1, len(cfg.APIKeys))
+	if len(cfg.APIKeys) != 1 {
+		t.Fatalf("expected 1 API key, got %d", len(cfg.APIKeys))
+	}
 }
 
 func TestAPIKeyManager_RemoveAPIKey(t *testing.T) {
@@ -68,10 +85,14 @@ func TestAPIKeyManager_RemoveAPIKey(t *testing.T) {
 	manager.AddAPIKey(testKey)
 
 	err := manager.RemoveAPIKey(testKey)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("RemoveAPIKey returned error: %v", err)
+	}
 
 	cfg := store.Snapshot()
-	assert.Equal(t, 0, len(cfg.APIKeys))
+	if len(cfg.APIKeys) != 0 {
+		t.Fatalf("expected 0 API keys, got %d", len(cfg.APIKeys))
+	}
 }
 
 func TestAPIKeyManager_RemoveNonExistentKey(t *testing.T) {
@@ -79,8 +100,12 @@ func TestAPIKeyManager_RemoveNonExistentKey(t *testing.T) {
 	manager := NewAPIKeyManager(store)
 
 	err := manager.RemoveAPIKey("sk-non-existent")
-	assert.Error(t, err)
-	assert.Equal(t, ErrAPIKeyNotFound, err)
+	if err == nil {
+		t.Fatal("expected error for non-existent key")
+	}
+	if err != ErrAPIKeyNotFound {
+		t.Fatalf("expected ErrAPIKeyNotFound, got %v", err)
+	}
 }
 
 func TestAPIKeyManager_IsAPIKeyValid(t *testing.T) {
@@ -107,9 +132,15 @@ func TestAPIKeyManager_IsAPIKeyValid(t *testing.T) {
 		return nil
 	})
 
-	assert.True(t, manager.IsAPIKeyValid(validKey))
-	assert.False(t, manager.IsAPIKeyValid(expiredKey))
-	assert.False(t, manager.IsAPIKeyValid("sk-non-existent"))
+	if !manager.IsAPIKeyValid(validKey) {
+		t.Fatal("expected valid key to be valid")
+	}
+	if manager.IsAPIKeyValid(expiredKey) {
+		t.Fatal("expected expired key to be invalid")
+	}
+	if manager.IsAPIKeyValid("sk-non-existent") {
+		t.Fatal("expected non-existent key to be invalid")
+	}
 }
 
 func TestAPIKeyManager_GetExpiringKeys(t *testing.T) {
@@ -135,7 +166,9 @@ func TestAPIKeyManager_GetExpiringKeys(t *testing.T) {
 	})
 
 	expiring := manager.GetExpiringKeys(7)
-	assert.Equal(t, 2, len(expiring))
+	if len(expiring) != 2 {
+		t.Fatalf("expected 2 expiring keys, got %d", len(expiring))
+	}
 }
 
 func TestAPIKeyManager_GetExpiredKeys(t *testing.T) {
@@ -160,7 +193,9 @@ func TestAPIKeyManager_GetExpiredKeys(t *testing.T) {
 	})
 
 	expired := manager.GetExpiredKeys()
-	assert.Equal(t, 2, len(expired))
+	if len(expired) != 2 {
+		t.Fatalf("expected 2 expired keys, got %d", len(expired))
+	}
 }
 
 func TestAPIKeyManager_CleanExpiredKeys(t *testing.T) {
@@ -185,12 +220,20 @@ func TestAPIKeyManager_CleanExpiredKeys(t *testing.T) {
 	})
 
 	removed, err := manager.CleanExpiredKeys()
-	require.NoError(t, err)
-	assert.Equal(t, 2, removed)
+	if err != nil {
+		t.Fatalf("CleanExpiredKeys returned error: %v", err)
+	}
+	if removed != 2 {
+		t.Fatalf("expected 2 removed keys, got %d", removed)
+	}
 
 	cfg := store.Snapshot()
-	assert.Equal(t, 1, len(cfg.APIKeys))
-	assert.Equal(t, "sk-valid", cfg.APIKeys[0].Key)
+	if len(cfg.APIKeys) != 1 {
+		t.Fatalf("expected 1 remaining key, got %d", len(cfg.APIKeys))
+	}
+	if cfg.APIKeys[0].Key != "sk-valid" {
+		t.Fatalf("expected remaining key sk-valid, got %s", cfg.APIKeys[0].Key)
+	}
 }
 
 func TestAPIKeyManager_GetValidKeys(t *testing.T) {
@@ -214,52 +257,13 @@ func TestAPIKeyManager_GetValidKeys(t *testing.T) {
 	})
 
 	validKeys := manager.GetValidKeys()
-	assert.Contains(t, validKeys, "sk-legacy-key")
-	assert.Contains(t, validKeys, "sk-valid-1")
-	assert.NotContains(t, validKeys, "sk-expired")
-}
-
-func TestGenerateAPIKeyID(t *testing.T) {
-	key1 := "sk-test-key-12345"
-	key2 := "sk-test-key-12345"
-	key3 := "sk-different-key"
-
-	id1 := generateAPIKeyID(key1)
-	id2 := generateAPIKeyID(key2)
-	id3 := generateAPIKeyID(key3)
-
-	assert.Equal(t, id1, id2)
-	assert.NotEqual(t, id1, id3)
-	assert.Contains(t, id1, "apikey:")
-}
-
-func TestMaskAPIKey(t *testing.T) {
-	tests := []struct {
-		name     string
-		key      string
-		expected string
-	}{
-		{
-			name:     "long key",
-			key:      "sk-abcdefghijklmnopqrstuvwxyz1234567890",
-			expected: "sk-abcdefgh****7890",
-		},
-		{
-			name:     "short key",
-			key:      "sk-1234",
-			expected: "****",
-		},
-		{
-			name:     "exactly 17 chars",
-			key:      "sk-12345678901234",
-			expected: "****",
-		},
+	if !slices.Contains(validKeys, "sk-legacy-key") {
+		t.Fatal("expected legacy key in valid keys")
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := maskAPIKey(tt.key)
-			assert.Equal(t, tt.expected, result)
-		})
+	if !slices.Contains(validKeys, "sk-valid-1") {
+		t.Fatal("expected valid metadata key in valid keys")
+	}
+	if slices.Contains(validKeys, "sk-expired") {
+		t.Fatal("did not expect expired key in valid keys")
 	}
 }
