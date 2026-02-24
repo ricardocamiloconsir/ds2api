@@ -3,21 +3,21 @@ package config
 import "time"
 
 type Config struct {
-	Keys             []string              `json:"keys,omitempty"`
-	APIKeys          []APIKeyMetadata      `json:"api_keys,omitempty"`
-	Accounts         []Account             `json:"accounts,omitempty"`
-	ClaudeMapping    map[string]string     `json:"claude_mapping,omitempty"`
-	ClaudeModelMap   map[string]string     `json:"claude_model_mapping,omitempty"`
-	ModelAliases     map[string]string     `json:"model_aliases,omitempty"`
-	Admin            AdminConfig           `json:"admin,omitempty"`
-	Runtime          RuntimeConfig         `json:"runtime,omitempty"`
-	Compat           CompatConfig          `json:"compat,omitempty"`
-	Toolcall         ToolcallConfig        `json:"toolcall,omitempty"`
-	Responses        ResponsesConfig       `json:"responses,omitempty"`
-	Embeddings       EmbeddingsConfig      `json:"embeddings,omitempty"`
-	VercelSyncHash   string                `json:"_vercel_sync_hash,omitempty"`
-	VercelSyncTime   int64                 `json:"_vercel_sync_time,omitempty"`
-	AdditionalFields map[string]any        `json:"-"`
+	Keys             []string          `json:"keys,omitempty"`
+	APIKeys          []APIKeyMetadata  `json:"api_keys,omitempty"`
+	Accounts         []Account         `json:"accounts,omitempty"`
+	ClaudeMapping    map[string]string `json:"claude_mapping,omitempty"`
+	ClaudeModelMap   map[string]string `json:"claude_model_mapping,omitempty"`
+	ModelAliases     map[string]string `json:"model_aliases,omitempty"`
+	Admin            AdminConfig       `json:"admin,omitempty"`
+	Runtime          RuntimeConfig     `json:"runtime,omitempty"`
+	Compat           CompatConfig      `json:"compat,omitempty"`
+	Toolcall         ToolcallConfig    `json:"toolcall,omitempty"`
+	Responses        ResponsesConfig   `json:"responses,omitempty"`
+	Embeddings       EmbeddingsConfig  `json:"embeddings,omitempty"`
+	VercelSyncHash   string            `json:"_vercel_sync_hash,omitempty"`
+	VercelSyncTime   int64             `json:"_vercel_sync_time,omitempty"`
+	AdditionalFields map[string]any    `json:"-"`
 }
 
 type APIKeyMetadata struct {
@@ -48,6 +48,9 @@ type RuntimeConfig struct {
 	AccountMaxInflight int `json:"account_max_inflight,omitempty"`
 	AccountMaxQueue    int `json:"account_max_queue,omitempty"`
 	GlobalMaxInflight  int `json:"global_max_inflight,omitempty"`
+	RateLimitPerIPRPM  int `json:"rate_limit_per_ip_rpm,omitempty"`
+	RateLimitGlobalRPM int `json:"rate_limit_global_rpm,omitempty"`
+	RateLimitBurst     int `json:"rate_limit_burst,omitempty"`
 }
 
 type ToolcallConfig struct {
