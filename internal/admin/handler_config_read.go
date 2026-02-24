@@ -2,13 +2,18 @@ package admin
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 )
 
 func (h *Handler) getConfig(w http.ResponseWriter, _ *http.Request) {
 	snap := h.Store.Snapshot()
+	keys := slices.Clone(snap.Keys)
+	if h.APIKeyManager != nil {
+		keys = h.APIKeyManager.GetValidKeys()
+	}
 	safe := map[string]any{
-		"keys":     snap.Keys,
+		"keys":     keys,
 		"accounts": []map[string]any{},
 		"claude_mapping": func() map[string]string {
 			if len(snap.ClaudeMapping) > 0 {
