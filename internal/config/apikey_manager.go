@@ -77,9 +77,6 @@ func (m *APIKeyManager) filterKeys(filter KeyFilterFunc) []APIKeyMetadata {
 
 func (m *APIKeyManager) IsAPIKeyValid(key string) bool {
 	now := time.Now()
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	cfg := m.store.Snapshot()
 	for _, metadata := range cfg.APIKeys {
 		if metadata.Key == key {
@@ -173,21 +170,21 @@ func (m *APIKeyManager) GetValidKeys() []string {
 	return validKeys
 }
 
-func (m *APIKeyManager) GetValidAPIKeys() []string {
+func (m *APIKeyManager) GetValidAPIKeysMetadata() []APIKeyMetadata {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	cfg := m.store.Snapshot()
 	now := time.Now()
-	validKeys := make([]string, 0, len(cfg.APIKeys))
+	validMetadata := make([]APIKeyMetadata, 0, len(cfg.APIKeys))
 
 	for _, metadata := range cfg.APIKeys {
 		if metadata.ExpiresAt.After(now) {
-			validKeys = append(validKeys, metadata.Key)
+			validMetadata = append(validMetadata, metadata)
 		}
 	}
 
-	return validKeys
+	return validMetadata
 }
 
 func generateAPIKeyID(key string) string {

@@ -86,6 +86,7 @@ export function useApiKeyExpiry({ apiFetch, t }) {
 
     useEffect(() => {
         let eventSource
+        let retryTimeout
         let retryCount = 0
         const maxRetries = 5
 
@@ -109,7 +110,7 @@ export function useApiKeyExpiry({ apiFetch, t }) {
                 eventSource.close()
                 retryCount++
                 if (retryCount <= maxRetries) {
-                    setTimeout(connectStream, 5000 * retryCount)
+                    retryTimeout = setTimeout(connectStream, 5000 * retryCount)
                 }
             }
 
@@ -124,6 +125,9 @@ export function useApiKeyExpiry({ apiFetch, t }) {
         return () => {
             if (eventSource) {
                 eventSource.close()
+            }
+            if (retryTimeout) {
+                clearTimeout(retryTimeout)
             }
         }
     }, [])

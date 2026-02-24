@@ -36,15 +36,14 @@ func MigrateAPIKeysToV2(cfg *Config) bool {
 	return true
 }
 
-func BackupConfig(filePath string) error {
-	backupPath := filePath + ".backup." + time.Now().Format("20060102-150405")
-	
+func BackupConfig(filePath string) (string, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return os.WriteFile(backupPath, data, 0644)
+	backupPath := filePath + ".backup." + time.Now().Format("20060102-150405")
+	return backupPath, os.WriteFile(backupPath, data, 0644)
 }
 
 func RestoreConfig(backupPath, targetPath string) error {

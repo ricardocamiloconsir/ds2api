@@ -114,6 +114,10 @@ func (n *Notifier) broadcast(notification Notification) {
 		select {
 		case sub <- notification:
 		default:
+			select {
+			case sub <- notification:
+			case <-time.After(time.Second):
+			}
 		}
 	}
 }

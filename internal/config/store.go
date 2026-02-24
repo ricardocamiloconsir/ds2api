@@ -29,26 +29,30 @@ func LoadStore() *Store {
 		Logger.Warn("[config] empty config loaded")
 	}
 
-	needsMigration := MigrateAPIKeysToV2(&cfg)
-	if needsMigration && !fromEnv {
-		backupPath := ConfigPath() + ".backup." + time.Now().Format("20060102-150405")
-		if err := BackupConfig(ConfigPath()); err != nil {
+	if len(cfg.Keys) > 0 && len(cfg.APIKeys) == 0 && !fromEnv {
+		tempPath := ConfigPath() + ".tmp"
+
+		backupPath, err := BackupConfig(ConfigPath())
+		if err != nil {
 			Logger.Warn("[config] backup failed", "error", err)
 			Logger.Warn("[config] aborting migration due to backup failure")
 		} else {
 			Logger.Info("[config] config backed up", "path", backupPath)
 
-			if err := SaveConfig(&cfg); err != nil {
-				Logger.Error("[config] failed to save migrated config", "error", err)
-				Logger.Warn("[config] restoring from backup due to save failure")
-				restoreErr := RestoreConfig(backupPath, ConfigPath())
-				if restoreErr != nil {
-					Logger.Error("[config] failed to restore from backup", "error", restoreErr)
+			if MigrateAPIKeysToV2(&cfg) {
+				if err := SaveConfigToPath(&cfg, tempPath); err != nil {
+					Logger.Error("[config] failed to write migrated config to temp file", "error", err)
+					Logger.Warn("[config] cleaning up temp file and aborting migration")
+					os.Remove(tempPath)
 				} else {
-					Logger.Info("[config] config restored from backup")
+					if err := os.Rename(tempPath, ConfigPath()); err != nil {
+						Logger.Error("[config] failed to rename temp file to config", "error", err)
+						Logger.Warn("[config] cleaning up temp file and aborting migration")
+						os.Remove(tempPath)
+					} else {
+						Logger.Info("[config] migration completed successfully")
+					}
 				}
-			} else {
-				Logger.Info("[config] migration completed successfully")
 			}
 		}
 	}
@@ -230,6 +234,14 @@ func (s *Store) saveLocked() error {
 		return err
 	}
 	return os.WriteFile(s.path, b, 0o644)
+}
+
+func SaveConfigToPath(cfg *Config, path string) error {
+	b, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, b, 0o644)
 }
 
 func (s *Store) IsEnvBacked() bool {
