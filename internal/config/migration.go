@@ -37,7 +37,7 @@ func MigrateAPIKeysToV2(cfg *Config) bool {
 			ID:        generateAPIKeyID(key),
 			Key:       key,
 			CreatedAt: now,
-			ExpiresAt: now.Add(APIKeyTTL),
+			ExpiresAt: APIKeyExpiryFrom(now),
 		}
 		apiKeys = append(apiKeys, metadata)
 		existing[key] = struct{}{}
