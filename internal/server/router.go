@@ -19,7 +19,6 @@ import (
 	"ds2api/internal/config"
 	"ds2api/internal/deepseek"
 	"ds2api/internal/monitor"
-	"ds2api/internal/ratelimit"
 	"ds2api/internal/webui"
 )
 
@@ -64,7 +63,6 @@ func NewApp() *App {
 	}
 	webuiHandler := webui.NewHandler()
 	metrics := newRequestMetrics()
-	rl := ratelimit.New(store.RuntimeRateLimitPerIPRPM(), store.RuntimeRateLimitGlobalRPM(), store.RuntimeRateLimitBurst())
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -74,7 +72,6 @@ func NewApp() *App {
 	r.Use(cors)
 	r.Use(timeout(0))
 	r.Use(metrics.middleware)
-	r.Use(rl.Handler)
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

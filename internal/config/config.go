@@ -48,9 +48,6 @@ type RuntimeConfig struct {
 	AccountMaxInflight int `json:"account_max_inflight,omitempty"`
 	AccountMaxQueue    int `json:"account_max_queue,omitempty"`
 	GlobalMaxInflight  int `json:"global_max_inflight,omitempty"`
-	RateLimitPerIPRPM  int `json:"rate_limit_per_ip_rpm,omitempty"`
-	RateLimitGlobalRPM int `json:"rate_limit_global_rpm,omitempty"`
-	RateLimitBurst     int `json:"rate_limit_burst,omitempty"`
 }
 
 type ToolcallConfig struct {
