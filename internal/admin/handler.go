@@ -11,7 +11,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"ds2api/internal/config"
-	"ds2api/internal/errors"
 	"ds2api/internal/monitor"
 )
 
@@ -72,7 +71,8 @@ func (h *Handler) writeJSONResponse(w http.ResponseWriter, payload any) {
 }
 
 func requireService[T any](service T, serviceName string, w http.ResponseWriter) bool {
-	if service == nil || (reflect.ValueOf(service).Kind() == reflect.Ptr && reflect.ValueOf(service).IsNil()) {
+	v := reflect.ValueOf(service)
+	if !v.IsValid() || ((v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface || v.Kind() == reflect.Map || v.Kind() == reflect.Slice || v.Kind() == reflect.Func || v.Kind() == reflect.Chan) && v.IsNil()) {
 		http.Error(w, serviceName+" not available", http.StatusServiceUnavailable)
 		return false
 	}
@@ -151,10 +151,7 @@ func (h *Handler) streamNotifications(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", config.SSEAccessControlOrigin)
 
 	sub := h.Notifier.Subscribe(ctx)
-	defer func() {
-		<-ctx.Done()
-		config.Logger.Debug("[sse] stream notification handler closed")
-	}()
+	defer config.Logger.Debug("[sse] stream notification handler closed")
 
 	for {
 		select {
@@ -174,6 +171,7 @@ func (h *Handler) streamNotifications(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if !h.writeSSEData(w, flusher, data) {
+				config.Logger.Debug("[sse] write failed, closing stream")
 				return
 			}
 		}
@@ -194,7 +192,7 @@ func (h *Handler) updateMonitorSettings(w http.ResponseWriter, r *http.Request) 
 
 	var req struct {
 		CheckInterval string `json:"check_interval"`
-		WarningDays  int    `json:"warning_days"`
+		WarningDays   int    `json:"warning_days"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -216,7 +214,6 @@ func (h *Handler) updateMonitorSettings(w http.ResponseWriter, r *http.Request) 
 
 	h.Monitor.CheckNow()
 
-	w.WriteHeader(http.StatusOK)
 	h.writeJSONResponse(w, map[string]string{"status": "updated"})
 }
 
@@ -227,6 +224,5 @@ func (h *Handler) checkMonitorNow(w http.ResponseWriter, r *http.Request) {
 
 	h.Monitor.CheckNow()
 
-	w.WriteHeader(http.StatusOK)
 	h.writeJSONResponse(w, map[string]string{"status": "checked"})
 }

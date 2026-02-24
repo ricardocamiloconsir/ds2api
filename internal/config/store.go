@@ -20,6 +20,22 @@ type Store struct {
 	accMap  map[string]int      // O(1) account lookup: identifier -> slice index
 }
 
+func NewStore(cfg *Config, path string) *Store {
+	storePath := path
+	if strings.TrimSpace(storePath) == "" {
+		storePath = ConfigPath()
+	}
+
+	var initial Config
+	if cfg != nil {
+		initial = cfg.Clone()
+	}
+
+	s := &Store{cfg: initial, path: storePath}
+	s.rebuildIndexes()
+	return s
+}
+
 func LoadStore() *Store {
 	cfg, fromEnv, err := loadConfig()
 	if err != nil {
@@ -47,7 +63,10 @@ func LoadStore() *Store {
 				} else {
 					if err := os.Rename(tempPath, ConfigPath()); err != nil {
 						Logger.Error("[config] failed to rename temp file to config", "error", err)
-						Logger.Warn("[config] cleaning up temp file and aborting migration")
+						Logger.Warn("[config] restoring config from backup")
+						if restoreErr := RestoreConfig(backupPath, ConfigPath()); restoreErr != nil {
+							Logger.Error("[config] failed to restore config from backup", "error", restoreErr)
+						}
 						os.Remove(tempPath)
 					} else {
 						Logger.Info("[config] migration completed successfully")
@@ -110,33 +129,26 @@ func (s *Store) findAPIKeyMetadataLocked(k string, cfg *Config) (APIKeyMetadata,
 func (s *Store) HasAPIKey(k string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	_, ok := s.keyMap[k]
-	if ok {
+	if _, found := s.findAPIKeyMetadataLocked(k, &s.cfg); found {
 		return true
 	}
-	_, found := s.findAPIKeyMetadataLocked(k, &s.cfg)
-	return found
+	_, ok := s.keyMap[k]
+	return ok
 }
 
 func (s *Store) HasValidAPIKey(k string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	_, ok := s.keyMap[k]
-	if ok {
-		return true
-	}
 	if metadata, found := s.findAPIKeyMetadataLocked(k, &s.cfg); found {
 		return time.Now().Before(metadata.ExpiresAt)
 	}
-	return false
+	_, ok := s.keyMap[k]
+	return ok
 }
 
 func (s *Store) IsAPIKeyExpired(k string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if _, ok := s.keyMap[k]; ok {
-		return false
-	}
 	if metadata, found := s.findAPIKeyMetadataLocked(k, &s.cfg); found {
 		return time.Now().After(metadata.ExpiresAt)
 	}
@@ -221,7 +233,7 @@ func (s *Store) Save() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.path, b, 0o644)
+	return os.WriteFile(s.path, b, 0o600)
 }
 
 func (s *Store) saveLocked() error {
@@ -233,7 +245,7 @@ func (s *Store) saveLocked() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.path, b, 0o644)
+	return os.WriteFile(s.path, b, 0o600)
 }
 
 func SaveConfigToPath(cfg *Config, path string) error {
@@ -241,7 +253,7 @@ func SaveConfigToPath(cfg *Config, path string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0o644)
+	return os.WriteFile(path, b, 0o600)
 }
 
 func (s *Store) IsEnvBacked() bool {

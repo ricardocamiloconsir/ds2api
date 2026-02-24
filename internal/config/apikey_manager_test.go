@@ -96,6 +96,7 @@ func TestAPIKeyManager_IsAPIKeyValid(t *testing.T) {
 	validKey := "sk-valid-key"
 	expiredKey := "sk-expired-key"
 	manager.AddAPIKey(validKey)
+	manager.AddAPIKey(expiredKey)
 
 	store.Update(func(c *Config) error {
 		for i, metadata := range c.APIKeys {

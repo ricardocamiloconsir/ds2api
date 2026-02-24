@@ -8,7 +8,6 @@ import (
 	"ds2api/internal/config"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestNotifier_Subscribe(t *testing.T) {
@@ -19,12 +18,12 @@ func TestNotifier_Subscribe(t *testing.T) {
 	assert.NotNil(t, sub)
 
 	cancel()
-	<-time.After(10 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 }
 
 func TestNotifier_NotifyExpiring(t *testing.T) {
 	notifier := NewNotifier()
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	sub := notifier.Subscribe(ctx)
@@ -37,7 +36,7 @@ func TestNotifier_NotifyExpiring(t *testing.T) {
 
 	select {
 	case notification := <-sub:
-		assert.Equal(t, NotificationTypeWarning, notification.Type)
+		assert.Equal(t, config.NotificationTypeWarning, notification.Type)
 		assert.Contains(t, notification.APIKey, "****")
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("Did not receive notification")
@@ -46,7 +45,7 @@ func TestNotifier_NotifyExpiring(t *testing.T) {
 
 func TestNotifier_NotifyExpired(t *testing.T) {
 	notifier := NewNotifier()
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	sub := notifier.Subscribe(ctx)
@@ -59,7 +58,7 @@ func TestNotifier_NotifyExpired(t *testing.T) {
 
 	select {
 	case notification := <-sub:
-		assert.Equal(t, NotificationTypeError, notification.Type)
+		assert.Equal(t, config.NotificationTypeExpired, notification.Type)
 		assert.Contains(t, notification.APIKey, "****")
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("Did not receive notification")
@@ -76,7 +75,7 @@ func TestNotifier_GetHistory(t *testing.T) {
 
 	history := notifier.GetHistory()
 	assert.Equal(t, 1, len(history))
-	assert.Equal(t, NotificationTypeWarning, history[0].Type)
+	assert.Equal(t, config.NotificationTypeWarning, history[0].Type)
 }
 
 func TestMonitor_GetStatus(t *testing.T) {

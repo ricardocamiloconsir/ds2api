@@ -49,13 +49,15 @@ func (m *Monitor) Start(ctx context.Context) {
 	}
 	m.running = true
 	ctx, m.cancel = context.WithCancel(ctx)
+	interval := m.checkInterval
+	warningDays := m.warningDays
 	m.mu.Unlock()
 
-	config.Logger.Info("[monitor] starting API key expiration monitor", "interval", m.checkInterval, "warningDays", m.warningDays)
+	config.Logger.Info("[monitor] starting API key expiration monitor", "interval", interval, "warningDays", warningDays)
 
 	m.checkExpirations()
 
-	ticker := time.NewTicker(m.checkInterval)
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {
@@ -85,9 +87,13 @@ func (m *Monitor) CheckNow() {
 func (m *Monitor) checkExpirations() {
 	config.Logger.Debug("[monitor] checking API key expirations")
 
-	expiring := m.apiKeyManager.GetExpiringKeys(m.warningDays)
+	m.mu.Lock()
+	warningDays := m.warningDays
+	m.mu.Unlock()
+
+	expiring := m.apiKeyManager.GetExpiringKeys(warningDays)
 	if len(expiring) > 0 {
-		config.Logger.Info("[monitor] found expiring API keys", "count", len(expiring), "days", m.warningDays)
+		config.Logger.Info("[monitor] found expiring API keys", "count", len(expiring), "days", warningDays)
 		m.notifier.notifyExpiring(expiring)
 	}
 
@@ -104,16 +110,19 @@ func (m *Monitor) checkExpirations() {
 
 func (m *Monitor) GetStatus() map[string]any {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	running := m.running
+	interval := m.checkInterval
+	warningDays := m.warningDays
+	m.mu.Unlock()
 
-	expiring := m.apiKeyManager.GetExpiringKeys(m.warningDays)
+	expiring := m.apiKeyManager.GetExpiringKeys(warningDays)
 	expired := m.apiKeyManager.GetExpiredKeys()
 	allKeys := m.apiKeyManager.GetAllAPIKeysMetadata()
 
 	return map[string]any{
-		"running":        m.running,
-		"check_interval":  m.checkInterval.String(),
-		"warning_days":   m.warningDays,
+		"running":        running,
+		"check_interval": interval.String(),
+		"warning_days":   warningDays,
 		"total_keys":     len(allKeys),
 		"expiring_keys":  len(expiring),
 		"expired_keys":   len(expired),
