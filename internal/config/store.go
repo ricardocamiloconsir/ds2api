@@ -84,6 +84,15 @@ func (s *Store) Snapshot() Config {
 	return s.cfg.Clone()
 }
 
+func (s *Store) findAPIKeyMetadataLocked(k string, cfg *Config) (APIKeyMetadata, bool) {
+	for _, metadata := range cfg.APIKeys {
+		if metadata.Key == k {
+			return metadata, true
+		}
+	}
+	return APIKeyMetadata{}, false
+}
+
 func (s *Store) HasAPIKey(k string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -91,10 +100,8 @@ func (s *Store) HasAPIKey(k string) bool {
 	if ok {
 		return true
 	}
-	for _, metadata := range s.cfg.APIKeys {
-		if metadata.Key == k {
-			return time.Now().Before(metadata.ExpiresAt)
-		}
+	if metadata, found := s.findAPIKeyMetadataLocked(k, &s.cfg); found {
+		return time.Now().Before(metadata.ExpiresAt)
 	}
 	return false
 }
@@ -106,10 +113,8 @@ func (s *Store) HasValidAPIKey(k string) bool {
 	if ok {
 		return true
 	}
-	for _, metadata := range s.cfg.APIKeys {
-		if metadata.Key == k && time.Now().Before(metadata.ExpiresAt) {
-			return true
-		}
+	if metadata, found := s.findAPIKeyMetadataLocked(k, &s.cfg); found {
+		return time.Now().Before(metadata.ExpiresAt)
 	}
 	return false
 }

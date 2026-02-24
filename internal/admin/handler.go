@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"reflect"
 	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"ds2api/internal/config"
+	"ds2api/internal/errors"
 	"ds2api/internal/monitor"
 )
 
@@ -62,72 +64,79 @@ func RegisterRoutes(r chi.Router, h *Handler) {
 	})
 }
 
-func (h *Handler) getAPIKeysMetadata(w http.ResponseWriter, r *http.Request) {
-	if h.APIKeyManager == nil {
-		http.Error(w, "API Key Manager not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	keys := h.APIKeyManager.GetAllAPIKeysMetadata()
+func (h *Handler) writeJSONResponse(w http.ResponseWriter, payload any) {
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(keys); err != nil {
+	if err := json.NewEncoder(w).Encode(payload); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
 
+func requireService[T any](service T, serviceName string, w http.ResponseWriter) bool {
+	if service == nil || (reflect.ValueOf(service).Kind() == reflect.Ptr && reflect.ValueOf(service).IsNil()) {
+		http.Error(w, serviceName+" not available", http.StatusServiceUnavailable)
+		return false
+	}
+	return true
+}
+
+func (h *Handler) writeSSEData(w http.ResponseWriter, flusher http.Flusher, data []byte) bool {
+	if _, err := w.Write([]byte("data: ")); err != nil {
+		config.Logger.Error("[sse] failed to write prefix", "error", err)
+		return false
+	}
+	if _, err := w.Write(data); err != nil {
+		config.Logger.Error("[sse] failed to write data", "error", err)
+		return false
+	}
+	if _, err := w.Write([]byte("\n\n")); err != nil {
+		config.Logger.Error("[sse] failed to write newline", "error", err)
+		return false
+	}
+	flusher.Flush()
+	return true
+}
+
+func (h *Handler) getAPIKeysMetadata(w http.ResponseWriter, r *http.Request) {
+	if !requireService(h.APIKeyManager, "API Key Manager", w) {
+		return
+	}
+	h.writeJSONResponse(w, h.APIKeyManager.GetAllAPIKeysMetadata())
+}
+
 func (h *Handler) getExpiringKeys(w http.ResponseWriter, r *http.Request) {
-	if h.APIKeyManager == nil {
-		http.Error(w, "API Key Manager not available", http.StatusServiceUnavailable)
+	if !requireService(h.APIKeyManager, "API Key Manager", w) {
 		return
 	}
 
-	days := 7
+	days := config.DefaultWarningDays
 	if d := r.URL.Query().Get("days"); d != "" {
 		if parsed, err := strconv.Atoi(d); err == nil && parsed > 0 {
 			days = parsed
 		}
 	}
-
-	keys := h.APIKeyManager.GetExpiringKeys(days)
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(keys); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	h.writeJSONResponse(w, h.APIKeyManager.GetExpiringKeys(days))
 }
 
 func (h *Handler) getExpiredKeys(w http.ResponseWriter, r *http.Request) {
-	if h.APIKeyManager == nil {
-		http.Error(w, "API Key Manager not available", http.StatusServiceUnavailable)
+	if !requireService(h.APIKeyManager, "API Key Manager", w) {
 		return
 	}
-
-	keys := h.APIKeyManager.GetExpiredKeys()
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(keys); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	h.writeJSONResponse(w, h.APIKeyManager.GetExpiredKeys())
 }
 
 func (h *Handler) getNotifications(w http.ResponseWriter, r *http.Request) {
-	if h.Notifier == nil {
-		http.Error(w, "Notifier not available", http.StatusServiceUnavailable)
+	if !requireService(h.Notifier, "Notifier", w) {
 		return
 	}
-
-	notifications := h.Notifier.GetHistory()
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(notifications); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	h.writeJSONResponse(w, h.Notifier.GetHistory())
 }
 
 func (h *Handler) streamNotifications(w http.ResponseWriter, r *http.Request) {
-	if h.Notifier == nil {
-		http.Error(w, "Notifier not available", http.StatusServiceUnavailable)
+	if !requireService(h.Notifier, "Notifier", w) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), time.Hour*2)
+	ctx, cancel := context.WithTimeout(r.Context(), config.SSETimeoutDefault)
 	defer cancel()
 
 	flusher, ok := w.(http.Flusher)
@@ -136,10 +145,10 @@ func (h *Handler) streamNotifications(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", config.SSEContentType)
+	w.Header().Set("Cache-Control", config.SSECacheControl)
+	w.Header().Set("Connection", config.SSEConnection)
+	w.Header().Set("Access-Control-Allow-Origin", config.SSEAccessControlOrigin)
 
 	sub := h.Notifier.Subscribe(ctx)
 	defer func() {
@@ -164,42 +173,22 @@ func (h *Handler) streamNotifications(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			if _, err := w.Write([]byte("data: ")); err != nil {
-				config.Logger.Error("[sse] failed to write to stream", "error", err)
+			if !h.writeSSEData(w, flusher, data) {
 				return
 			}
-
-			if _, err := w.Write(data); err != nil {
-				config.Logger.Error("[sse] failed to write to stream", "error", err)
-				return
-			}
-
-			if _, err := w.Write([]byte("\n\n")); err != nil {
-				config.Logger.Error("[sse] failed to write to stream", "error", err)
-				return
-			}
-
-			flusher.Flush()
 		}
-}
+	}
 }
 
 func (h *Handler) getMonitorStatus(w http.ResponseWriter, r *http.Request) {
-	if h.Monitor == nil {
-		http.Error(w, "Monitor not available", http.StatusServiceUnavailable)
+	if !requireService(h.Monitor, "Monitor", w) {
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	status := h.Monitor.GetStatus()
-	if err := json.NewEncoder(w).Encode(status); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	h.writeJSONResponse(w, h.Monitor.GetStatus())
 }
 
 func (h *Handler) updateMonitorSettings(w http.ResponseWriter, r *http.Request) {
-	if h.Monitor == nil {
-		http.Error(w, "Monitor not available", http.StatusServiceUnavailable)
+	if !requireService(h.Monitor, "Monitor", w) {
 		return
 	}
 
@@ -228,21 +217,16 @@ func (h *Handler) updateMonitorSettings(w http.ResponseWriter, r *http.Request) 
 	h.Monitor.CheckNow()
 
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]string{"status": "updated"}); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	h.writeJSONResponse(w, map[string]string{"status": "updated"})
 }
 
 func (h *Handler) checkMonitorNow(w http.ResponseWriter, r *http.Request) {
-	if h.Monitor == nil {
-		http.Error(w, "Monitor not available", http.StatusServiceUnavailable)
+	if !requireService(h.Monitor, "Monitor", w) {
 		return
 	}
 
 	h.Monitor.CheckNow()
 
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]string{"status": "checked"}); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	h.writeJSONResponse(w, map[string]string{"status": "checked"})
 }

@@ -19,18 +19,13 @@ type Monitor struct {
 	mu            sync.Mutex
 }
 
-const (
-	DefaultCheckInterval = 24 * time.Hour
-	DefaultWarningDays   = 7
-)
-
 func NewMonitor(store *config.Store, apiKeyManager *config.APIKeyManager, notifier *Notifier) *Monitor {
 	return &Monitor{
 		store:         store,
 		apiKeyManager: apiKeyManager,
 		notifier:      notifier,
-		checkInterval: DefaultCheckInterval,
-		warningDays:   DefaultWarningDays,
+		checkInterval: config.DefaultCheckInterval,
+		warningDays:   config.DefaultWarningDays,
 	}
 }
 

@@ -1,29 +1,25 @@
 import { Clock, AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
+import { calculateDaysUntilExpiry, getKeyExpiryStatusFromMetadata, EXPIRY_THRESHOLDS } from '../../utils/apiKeyUtils'
 
 export default function ApiKeyExpiryPanel({ t, apiKeysMetadata, onRefresh, onCheckNow }) {
     const [loading, setLoading] = useState(false)
 
-    const validKeys = apiKeysMetadata.filter(k => new Date(k.expires_at) > new Date())
+    const validKeys = apiKeysMetadata.filter(k => getKeyExpiryStatusFromMetadata(k).status === 'valid')
     const expiringKeys = apiKeysMetadata.filter(k => {
-        const expiresAt = new Date(k.expires_at)
-        const now = new Date()
-        const daysUntilExpiry = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24))
-        return daysUntilExpiry > 0 && daysUntilExpiry <= 7
+        const status = getKeyExpiryStatusFromMetadata(k)
+        return status.status === 'expiring'
     })
-    const expiredKeys = apiKeysMetadata.filter(k => new Date(k.expires_at) <= new Date())
-
-    const getDaysLeft = (expiresAt) => {
-        const now = new Date()
-        const diff = new Date(expiresAt) - now
-        return Math.ceil(diff / (1000 * 60 * 60 * 24))
-    }
+    const expiredKeys = apiKeysMetadata.filter(k => {
+        const status = getKeyExpiryStatusFromMetadata(k)
+        return status.status === 'expired'
+    })
 
     const getStatusBadge = (daysLeft) => {
-        if (daysLeft <= 0) {
+        if (daysLeft <= EXPIRY_THRESHOLDS.CRITICAL) {
             return { color: 'red', text: t('apiKey.expired'), icon: AlertCircle }
-        } else if (daysLeft <= 7) {
+        } else if (daysLeft <= EXPIRY_THRESHOLDS.WARNING) {
             return { color: 'yellow', text: t('apiKey.expiringSoon'), icon: AlertTriangle }
         }
         return { color: 'green', text: t('apiKey.valid'), icon: Clock }
@@ -79,7 +75,7 @@ export default function ApiKeyExpiryPanel({ t, apiKeysMetadata, onRefresh, onChe
                             </h3>
                             <div className="space-y-2">
                                 {validKeys.map((key) => {
-                                    const daysLeft = getDaysLeft(key.expires_at)
+                                    const daysLeft = calculateDaysUntilExpiry(key.expires_at)
                                     const status = getStatusBadge(daysLeft)
                                     return (
                                         <div
@@ -113,7 +109,7 @@ export default function ApiKeyExpiryPanel({ t, apiKeysMetadata, onRefresh, onChe
                             </h3>
                             <div className="space-y-2">
                                 {expiringKeys.map((key) => {
-                                    const daysLeft = getDaysLeft(key.expires_at)
+                                    const daysLeft = calculateDaysUntilExpiry(key.expires_at)
                                     const status = getStatusBadge(daysLeft)
                                     return (
                                         <div
@@ -147,7 +143,7 @@ export default function ApiKeyExpiryPanel({ t, apiKeysMetadata, onRefresh, onChe
                             </h3>
                             <div className="space-y-2">
                                 {expiredKeys.map((key) => {
-                                    const daysLeft = getDaysLeft(key.expires_at)
+                                    const daysLeft = calculateDaysUntilExpiry(key.expires_at)
                                     const status = getStatusBadge(daysLeft)
                                     return (
                                         <div

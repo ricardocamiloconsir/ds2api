@@ -2,38 +2,39 @@ package monitor
 
 import (
 	"context"
-	"time"
-
 	"ds2api/internal/config"
+	"sync"
+	"time"
 )
 
 type NotificationType string
 
-const (
-	NotificationTypeWarning NotificationType = "warning"
-	NotificationTypeError  NotificationType = "expired"
-)
-
 type Notification struct {
-	Type      NotificationType `json:"type"`
-	APIKey    string          `json:"api_key"`
-	Message   string          `json:"message"`
-	ExpiresAt time.Time       `json:"expires_at"`
-	Timestamp time.Time       `json:"timestamp"`
+	ID        string            `json:"id"`
+	Type      NotificationType  `json:"type"`
+	APIKey    string            `json:"apiKey"`
+	Message   string            `json:"message"`
+	ExpiresAt time.Time         `json:"expiresAt"`
+	Timestamp time.Time         `json:"timestamp"`
+	Data      map[string]any    `json:"data,omitempty"`
 }
 
 type Notifier struct {
-	subscribers []chan<- Notification
-	history     []Notification
-	maxHistory  int
-	mu          sync.Mutex
+	mu          sync.RWMutex
+	subscribers  map[chan Notification]struct{}
+	history      []Notification
+	maxHistory   int
 }
 
-func NewNotifier() *Notifier {
+func NewNotifier(maxHistory ...int) *Notifier {
+	mh := config.DefaultMaxHistory
+	if len(maxHistory) > 0 && maxHistory[0] > 0 {
+		mh = maxHistory[0]
+	}
 	return &Notifier{
-		history:    make([]Notification, 0, 100),
-		maxHistory: 100,
-		subscribers: make([]chan<- Notification, 0),
+		subscribers: make(map[chan Notification]struct{}),
+		history:     make([]Notification, 0),
+		maxHistory:  mh,
 	}
 }
 
@@ -41,8 +42,8 @@ func (n *Notifier) Subscribe(ctx context.Context) <-chan Notification {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	ch := make(chan Notification, 10)
-	n.subscribers = append(n.subscribers, ch)
+	ch := make(chan Notification, config.NotificationBufferSize)
+	n.subscribers[ch] = struct{}{}
 
 	go func() {
 		<-ctx.Done()
@@ -53,15 +54,10 @@ func (n *Notifier) Subscribe(ctx context.Context) <-chan Notification {
 	return ch
 }
 
-func (n *Notifier) unsubscribe(ch chan<- Notification) {
+func (n *Notifier) unsubscribe(ch chan Notification) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	for i, sub := range n.subscribers {
-		if sub == ch {
-			n.subscribers = append(n.subscribers[:i], n.subscribers[i+1:]...)
-			break
-		}
-	}
+	delete(n.subscribers, ch)
 }
 
 func (n *Notifier) notifyExpiring(keys []config.APIKeyMetadata) {
@@ -70,7 +66,7 @@ func (n *Notifier) notifyExpiring(keys []config.APIKeyMetadata) {
 
 	for _, key := range keys {
 		notification := Notification{
-			Type:      NotificationTypeWarning,
+			Type:      config.NotificationTypeWarning,
 			APIKey:    maskAPIKey(key.Key),
 			Message:   "API key expiring soon",
 			ExpiresAt: key.ExpiresAt,
@@ -87,7 +83,7 @@ func (n *Notifier) notifyExpired(keys []config.APIKeyMetadata) {
 
 	for _, key := range keys {
 		notification := Notification{
-			Type:      NotificationTypeError,
+			Type:      config.NotificationTypeError,
 			APIKey:    maskAPIKey(key.Key),
 			Message:   "API key has expired",
 			ExpiresAt: key.ExpiresAt,
@@ -99,8 +95,8 @@ func (n *Notifier) notifyExpired(keys []config.APIKeyMetadata) {
 }
 
 func (n *Notifier) GetHistory() []Notification {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+	n.mu.RLock()
+	defer n.mu.RUnlock()
 	result := make([]Notification, len(n.history))
 	copy(result, n.history)
 	return result
@@ -114,7 +110,7 @@ func (n *Notifier) addToHistory(notification Notification) {
 }
 
 func (n *Notifier) broadcast(notification Notification) {
-	for _, sub := range n.subscribers {
+	for sub := range n.subscribers {
 		select {
 		case sub <- notification:
 		default:

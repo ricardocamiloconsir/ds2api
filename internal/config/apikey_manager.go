@@ -59,6 +59,22 @@ func (m *APIKeyManager) RemoveAPIKey(key string) error {
 	})
 }
 
+type KeyFilterFunc func(APIKeyMetadata) bool
+
+func (m *APIKeyManager) filterKeys(filter KeyFilterFunc) []APIKeyMetadata {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	cfg := m.store.Snapshot()
+	result := make([]APIKeyMetadata, 0)
+	for _, metadata := range cfg.APIKeys {
+		if filter(metadata) {
+			result = append(result, metadata)
+		}
+	}
+	return result
+}
+
 func (m *APIKeyManager) IsAPIKeyValid(key string) bool {
 	now := time.Now()
 	m.mu.RLock()
@@ -95,38 +111,18 @@ func (m *APIKeyManager) GetAPIKeyMetadata(key string) (APIKeyMetadata, bool) {
 }
 
 func (m *APIKeyManager) GetExpiringKeys(daysBefore int) []APIKeyMetadata {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	cfg := m.store.Snapshot()
 	now := time.Now()
 	threshold := now.Add(time.Duration(daysBefore) * 24 * time.Hour)
-
-	var expiring []APIKeyMetadata
-	for _, metadata := range cfg.APIKeys {
-		if metadata.ExpiresAt.After(now) && metadata.ExpiresAt.Before(threshold) {
-			expiring = append(expiring, metadata)
-		}
-	}
-
-	return expiring
+	return m.filterKeys(func(k APIKeyMetadata) bool {
+		return k.ExpiresAt.After(now) && k.ExpiresAt.Before(threshold)
+	})
 }
 
 func (m *APIKeyManager) GetExpiredKeys() []APIKeyMetadata {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	cfg := m.store.Snapshot()
 	now := time.Now()
-
-	var expired []APIKeyMetadata
-	for _, metadata := range cfg.APIKeys {
-		if metadata.ExpiresAt.Before(now) {
-			expired = append(expired, metadata)
-		}
-	}
-
-	return expired
+	return m.filterKeys(func(k APIKeyMetadata) bool {
+		return k.ExpiresAt.Before(now)
+	})
 }
 
 func (m *APIKeyManager) CleanExpiredKeys() (int, error) {

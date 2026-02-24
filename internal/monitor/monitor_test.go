@@ -93,8 +93,8 @@ func TestMonitor_GetStatus(t *testing.T) {
 
 	status := monitor.GetStatus()
 	assert.Equal(t, false, status["running"])
-	assert.Equal(t, DefaultWarningDays, status["warning_days"])
-	assert.Equal(t, DefaultCheckInterval.String(), status["check_interval"])
+	assert.Equal(t, config.DefaultWarningDays, status["warning_days"])
+	assert.Equal(t, config.DefaultCheckInterval.String(), status["check_interval"])
 }
 
 func TestMonitor_CheckExpirations(t *testing.T) {

@@ -1,5 +1,6 @@
 import { Check, ChevronDown, Copy, Plus, Trash2, Clock, AlertTriangle, AlertCircle } from 'lucide-react'
 import clsx from 'clsx'
+import { calculateDaysUntilExpiry, EXPIRY_THRESHOLDS } from '../../utils/apiKeyUtils'
 
 export default function ApiKeysPanel({
     t,
@@ -16,13 +17,11 @@ export default function ApiKeysPanel({
         const metadata = apiKeysMetadata.find(m => m.key === key)
         if (!metadata) return { status: 'valid', daysLeft: null }
 
-        const now = new Date()
-        const expiresAt = new Date(metadata.expires_at)
-        const daysLeft = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24))
+        const daysLeft = calculateDaysUntilExpiry(metadata.expires_at)
 
-        if (daysLeft <= 0) {
+        if (daysLeft <= EXPIRY_THRESHOLDS.CRITICAL) {
             return { status: 'expired', daysLeft }
-        } else if (daysLeft <= 7) {
+        } else if (daysLeft <= EXPIRY_THRESHOLDS.WARNING) {
             return { status: 'expiring', daysLeft }
         }
         return { status: 'valid', daysLeft }
