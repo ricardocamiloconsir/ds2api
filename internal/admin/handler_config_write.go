@@ -73,6 +73,16 @@ func (h *Handler) addKey(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "Key 不能为空"})
 		return
 	}
+
+	if h.APIKeyManager != nil {
+		if err := h.APIKeyManager.AddAPIKey(key); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_keys": len(h.APIKeyManager.GetValidKeys())})
+		return
+	}
+
 	err := h.Store.Update(func(c *config.Config) error {
 		for _, k := range c.Keys {
 			if k == key {
@@ -91,6 +101,16 @@ func (h *Handler) addKey(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) deleteKey(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "key")
+
+	if h.APIKeyManager != nil {
+		if err := h.APIKeyManager.RemoveAPIKey(key); err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]any{"detail": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_keys": len(h.APIKeyManager.GetValidKeys())})
+		return
+	}
+
 	err := h.Store.Update(func(c *config.Config) error {
 		idx := -1
 		for i, k := range c.Keys {

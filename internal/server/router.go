@@ -18,6 +18,7 @@ import (
 	"ds2api/internal/auth"
 	"ds2api/internal/config"
 	"ds2api/internal/deepseek"
+	"ds2api/internal/monitor"
 	"ds2api/internal/webui"
 )
 
@@ -43,10 +44,23 @@ func NewApp() *App {
 		config.Logger.Info("[WASM] module preloaded", "path", config.WASMPath())
 	}
 
+	apiKeyManager := config.NewAPIKeyManager(store)
+	notifier := monitor.NewNotifier()
+	monitorService := monitor.NewMonitor(store, apiKeyManager, notifier)
+
+	go monitorService.Start(context.Background())
+
 	openaiHandler := &openai.Handler{Store: store, Auth: resolver, DS: dsClient}
 	claudeHandler := &claude.Handler{Store: store, Auth: resolver, DS: dsClient}
 	geminiHandler := &gemini.Handler{Store: store, Auth: resolver, DS: dsClient}
-	adminHandler := &admin.Handler{Store: store, Pool: pool, DS: dsClient}
+	adminHandler := &admin.Handler{
+		Store:         store,
+		Pool:          pool,
+		DS:            dsClient,
+		APIKeyManager: apiKeyManager,
+		Monitor:       monitorService,
+		Notifier:      notifier,
+	}
 	webuiHandler := webui.NewHandler()
 
 	r := chi.NewRouter()

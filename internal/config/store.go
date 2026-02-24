@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Store struct {
@@ -27,6 +28,21 @@ func LoadStore() *Store {
 	if len(cfg.Keys) == 0 && len(cfg.Accounts) == 0 {
 		Logger.Warn("[config] empty config loaded")
 	}
+
+	needsMigration := MigrateAPIKeysToV2(&cfg)
+	if needsMigration && !fromEnv {
+		backupPath := ConfigPath() + ".backup." + time.Now().Format("20060102-150405")
+		if err := BackupConfig(ConfigPath()); err != nil {
+			Logger.Warn("[config] backup failed", "error", err)
+		} else {
+			Logger.Info("[config] config backed up", "path", backupPath)
+		}
+
+		if err := SaveConfig(&cfg); err != nil {
+			Logger.Warn("[config] failed to save migrated config", "error", err)
+		}
+	}
+
 	s := &Store{cfg: cfg, path: ConfigPath(), fromEnv: fromEnv}
 	s.rebuildIndexes()
 	return s
@@ -72,7 +88,30 @@ func (s *Store) HasAPIKey(k string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	_, ok := s.keyMap[k]
-	return ok
+	if ok {
+		return true
+	}
+	for _, metadata := range s.cfg.APIKeys {
+		if metadata.Key == k {
+			return time.Now().Before(metadata.ExpiresAt)
+		}
+	}
+	return false
+}
+
+func (s *Store) HasValidAPIKey(k string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, ok := s.keyMap[k]
+	if ok {
+		return true
+	}
+	for _, metadata := range s.cfg.APIKeys {
+		if metadata.Key == k && time.Now().Before(metadata.ExpiresAt) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Store) Keys() []string {
