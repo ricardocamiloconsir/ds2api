@@ -13,26 +13,46 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
     const [testingAll, setTestingAll] = useState(false)
     const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, results: [] })
 
+    const fetchLatestKeys = async () => {
+        const res = await apiFetch('/admin/config')
+        if (!res.ok) {
+            throw new Error(t('batchImport.fetchConfigFailed'))
+        }
+        const data = await res.json()
+        return Array.isArray(data.keys) ? data.keys : []
+    }
+
     const addKey = async () => {
-        if (!newKey.trim()) return
+        if (!newKey.trim()) {
+            onMessage('error', t('accountManager.requiredFields'))
+            return
+        }
+        const normalizedKey = newKey.trim()
         setLoading(true)
         try {
+            console.info('[api-key] starting creation flow')
             const res = await apiFetch('/admin/keys', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key: newKey.trim() }),
+                body: JSON.stringify({ key: normalizedKey }),
             })
             if (res.ok) {
+                const latestKeys = await fetchLatestKeys()
+                if (!latestKeys.includes(normalizedKey)) {
+                    throw new Error(t('batchImport.fetchConfigFailed'))
+                }
+                await onRefresh()
                 onMessage('success', t('accountManager.addKeySuccess'))
                 setNewKey('')
                 setShowAddKey(false)
-                onRefresh()
+                console.info('[api-key] key created and list refreshed successfully')
             } else {
                 const data = await res.json()
                 onMessage('error', data.detail || t('messages.failedToAdd'))
             }
         } catch (e) {
-            onMessage('error', t('messages.networkError'))
+            onMessage('error', e.message || t('messages.networkError'))
+            console.error('[api-key] failed to create key:', e)
         } finally {
             setLoading(false)
         }

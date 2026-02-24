@@ -66,20 +66,31 @@ func (h *Handler) updateConfig(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) addKey(w http.ResponseWriter, r *http.Request) {
 	var req map[string]any
-	_ = json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		config.Logger.Error("[admin][keys] failed to decode add key request", "error", err)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "invalid json"})
+		return
+	}
 	key, _ := req["key"].(string)
 	key = strings.TrimSpace(key)
 	if key == "" {
+		config.Logger.Warn("[admin][keys] rejected empty key")
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "Key 不能为空"})
 		return
 	}
 
+	masked := safeTruncate(key, 8)
+	config.Logger.Info("[admin][keys] add key requested", "key", masked, "has_manager", h.APIKeyManager != nil)
+
 	if h.APIKeyManager != nil {
 		if err := h.APIKeyManager.AddAPIKey(key); err != nil {
+			config.Logger.Error("[admin][keys] failed to persist key via manager", "key", masked, "error", err)
 			writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_keys": len(h.APIKeyManager.GetValidKeys())})
+		totalKeys := len(h.APIKeyManager.GetValidKeys())
+		config.Logger.Info("[admin][keys] key persisted via manager", "key", masked, "total_keys", totalKeys)
+		writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_keys": totalKeys})
 		return
 	}
 
@@ -93,10 +104,13 @@ func (h *Handler) addKey(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if err != nil {
+		config.Logger.Error("[admin][keys] failed to persist key via store", "key", masked, "error", err)
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_keys": len(h.Store.Snapshot().Keys)})
+	totalKeys := len(h.Store.Snapshot().Keys)
+	config.Logger.Info("[admin][keys] key persisted via store", "key", masked, "total_keys", totalKeys)
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_keys": totalKeys})
 }
 
 func (h *Handler) deleteKey(w http.ResponseWriter, r *http.Request) {
