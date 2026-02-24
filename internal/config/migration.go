@@ -30,6 +30,7 @@ func MigrateAPIKeysToV2(cfg *Config) bool {
 	}
 
 	cfg.APIKeys = apiKeys
+	cfg.Keys = nil
 
 	Logger.Info("[migration] migration completed", "migrated_keys", len(apiKeys))
 
