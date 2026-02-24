@@ -1,5 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
 
+const normalizeNotification = (notification) => {
+    const apiKey = notification.api_key ?? notification.apiKey ?? ''
+    const timestamp = notification.timestamp ?? ''
+
+    return {
+        ...notification,
+        id: notification.id ?? `${timestamp}_${apiKey}`,
+        dismissed: notification.dismissed ?? false,
+    }
+}
+
 export function useApiKeyExpiry({ apiFetch, t }) {
     const [apiKeysMetadata, setApiKeysMetadata] = useState([])
     const [notifications, setNotifications] = useState([])
@@ -23,7 +34,7 @@ export function useApiKeyExpiry({ apiFetch, t }) {
             const res = await apiFetch('/admin/notifications')
             if (res.ok) {
                 const data = await res.json()
-                setNotifications(data)
+                setNotifications(data.map(normalizeNotification))
             }
         } catch (e) {
             console.error('Failed to fetch notifications:', e)
@@ -49,7 +60,7 @@ export function useApiKeyExpiry({ apiFetch, t }) {
                 await Promise.all([
                     fetchApiKeysMetadata(),
                     fetchNotifications(),
-                    fetchMonitorStatus()
+                    fetchMonitorStatus(),
                 ])
             }
         } catch (e) {
@@ -73,8 +84,8 @@ export function useApiKeyExpiry({ apiFetch, t }) {
     }, [apiFetch, fetchMonitorStatus])
 
     const dismissNotification = useCallback((id) => {
-        setNotifications(prev => prev.map(n => 
-            n.id === id ? { ...n, dismissed: true } : n
+        setNotifications(prev => prev.map(n =>
+            n.id === id ? { ...n, dismissed: true } : n,
         ))
     }, [])
 
@@ -88,29 +99,37 @@ export function useApiKeyExpiry({ apiFetch, t }) {
         let eventSource
         let retryTimeout
         let retryCount = 0
+        let cancelled = false
         const maxRetries = 5
 
         const connectStream = () => {
+            if (cancelled) return
+
             eventSource = new EventSource('/admin/notifications/stream')
 
             eventSource.onmessage = (event) => {
                 try {
-                    const notification = JSON.parse(event.data)
-                    setNotifications(prev => [
-                        { ...notification, id: Date.now() + Math.random(), dismissed: false },
-                        ...prev
-                    ])
+                    const notification = normalizeNotification(JSON.parse(event.data))
+                    setNotifications(prev => [notification, ...prev])
                 } catch (e) {
                     console.error('Failed to parse notification:', e)
                 }
             }
 
             eventSource.onerror = () => {
+                if (eventSource) {
+                    eventSource.close()
+                }
+                if (cancelled) return
+
                 console.warn('SSE connection error, attempting to reconnect...')
-                eventSource.close()
                 retryCount++
                 if (retryCount <= maxRetries) {
-                    retryTimeout = setTimeout(connectStream, 5000 * retryCount)
+                    retryTimeout = setTimeout(() => {
+                        if (!cancelled) {
+                            connectStream()
+                        }
+                    }, 5000 * retryCount)
                 }
             }
 
@@ -123,6 +142,7 @@ export function useApiKeyExpiry({ apiFetch, t }) {
         connectStream()
 
         return () => {
+            cancelled = true
             if (eventSource) {
                 eventSource.close()
             }
@@ -132,20 +152,25 @@ export function useApiKeyExpiry({ apiFetch, t }) {
         }
     }, [])
 
+    const refresh = useCallback(async () => {
+        setLoading(true)
+        try {
+            await Promise.all([
+                fetchApiKeysMetadata(),
+                fetchNotifications(),
+                fetchMonitorStatus(),
+            ])
+        } finally {
+            setLoading(false)
+        }
+    }, [fetchApiKeysMetadata, fetchNotifications, fetchMonitorStatus])
+
     return {
         apiKeysMetadata,
         notifications,
         monitorStatus,
         loading,
-        refresh: async () => {
-            setLoading(true)
-            await Promise.all([
-                fetchApiKeysMetadata(),
-                fetchNotifications(),
-                fetchMonitorStatus()
-            ])
-            setLoading(false)
-        },
+        refresh,
         checkNow,
         updateMonitorSettings,
         dismissNotification,

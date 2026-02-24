@@ -43,8 +43,13 @@ func BackupConfig(filePath string) (string, error) {
 		return "", err
 	}
 
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return "", err
+	}
+
 	backupPath := filePath + ".backup." + time.Now().Format("20060102-150405")
-	return backupPath, os.WriteFile(backupPath, data, 0644)
+	return backupPath, os.WriteFile(backupPath, data, fileInfo.Mode().Perm())
 }
 
 func RestoreConfig(backupPath, targetPath string) error {
@@ -53,5 +58,10 @@ func RestoreConfig(backupPath, targetPath string) error {
 		return err
 	}
 
-	return os.WriteFile(targetPath, data, 0644)
+	backupInfo, err := os.Stat(backupPath)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(targetPath, data, backupInfo.Mode().Perm())
 }

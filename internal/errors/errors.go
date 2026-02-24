@@ -1,7 +1,10 @@
 package errors
 
 import (
+	"encoding/json"
+	stderrors "errors"
 	"fmt"
+	"log"
 	"net/http"
 )
 
@@ -31,27 +34,34 @@ func NewAppError(code, message string, err error) *AppError {
 }
 
 var (
-	ErrUnauthorized      = NewAppError("UNAUTHORIZED", "unauthorized: missing auth token", nil)
-	ErrAccountNotFound  = NewAppError("ACCOUNT_NOT_FOUND", "账号不存在", nil)
-	ErrAPIKeyNotFound   = NewAppError("API_KEY_NOT_FOUND", "API key not found", nil)
-	ErrInvalidRequest   = NewAppError("INVALID_REQUEST", "需要 email 或 mobile", nil)
+	ErrUnauthorized        = NewAppError("UNAUTHORIZED", "unauthorized: missing auth token", nil)
+	ErrAccountNotFound     = NewAppError("ACCOUNT_NOT_FOUND", "账号不存在", nil)
+	ErrAPIKeyNotFound      = NewAppError("API_KEY_NOT_FOUND", "API key not found", nil)
+	ErrInvalidRequest      = NewAppError("INVALID_REQUEST", "需要 email 或 mobile", nil)
 	ErrServiceNotAvailable = NewAppError("SERVICE_UNAVAILABLE", "service not available", nil)
-	ErrAccountExists    = NewAppError("ACCOUNT_EXISTS", "邮箱已存在", nil)
-	ErrMobileExists     = NewAppError("MOBILE_EXISTS", "手机号已存在", nil)
+	ErrAccountExists       = NewAppError("ACCOUNT_EXISTS", "邮箱已存在", nil)
+	ErrMobileExists        = NewAppError("MOBILE_EXISTS", "手机号已存在", nil)
 )
 
 func WriteErrorResponse(w http.ResponseWriter, err error) {
-	if err == nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+	status := http.StatusInternalServerError
+	detail := "Internal server error"
+
+	if err != nil {
+		var appErr *AppError
+		if stderrors.As(err, &appErr) {
+			status = statusCodeForError(appErr.Code)
+			detail = appErr.Message
+		} else {
+			log.Printf("[errors] internal error: %v", err)
+		}
 	}
 
-	if appErr, ok := err.(*AppError); ok {
-		http.Error(w, appErr.Message, statusCodeForError(appErr.Code))
-		return
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if encodeErr := json.NewEncoder(w).Encode(map[string]string{"detail": detail}); encodeErr != nil {
+		log.Printf("[errors] failed to encode error response: %v", encodeErr)
 	}
-
-	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
 func statusCodeForError(code string) int {
@@ -64,6 +74,8 @@ func statusCodeForError(code string) int {
 		return http.StatusBadRequest
 	case "SERVICE_UNAVAILABLE":
 		return http.StatusServiceUnavailable
+	case "ACCOUNT_EXISTS", "MOBILE_EXISTS":
+		return http.StatusConflict
 	default:
 		return http.StatusInternalServerError
 	}

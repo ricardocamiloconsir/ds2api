@@ -4,18 +4,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"slices"
-	"sync"
 	"time"
-)
-
-const (
-	APIKeyTTLDays = 30
-	APIKeyTTL     = APIKeyTTLDays * 24 * time.Hour
 )
 
 type APIKeyManager struct {
 	store *Store
-	mu    sync.RWMutex
 }
 
 func NewAPIKeyManager(store *Store) *APIKeyManager {
@@ -62,9 +55,6 @@ func (m *APIKeyManager) RemoveAPIKey(key string) error {
 type KeyFilterFunc func(APIKeyMetadata) bool
 
 func (m *APIKeyManager) filterKeys(filter KeyFilterFunc) []APIKeyMetadata {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	cfg := m.store.Snapshot()
 	result := make([]APIKeyMetadata, 0)
 	for _, metadata := range cfg.APIKeys {
@@ -76,9 +66,6 @@ func (m *APIKeyManager) filterKeys(filter KeyFilterFunc) []APIKeyMetadata {
 }
 
 func (m *APIKeyManager) IsAPIKeyValid(key string) bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	now := time.Now()
 	cfg := m.store.Snapshot()
 	for _, metadata := range cfg.APIKeys {
@@ -97,9 +84,6 @@ func (m *APIKeyManager) IsAPIKeyValid(key string) bool {
 }
 
 func (m *APIKeyManager) GetAPIKeyMetadata(key string) (APIKeyMetadata, bool) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	cfg := m.store.Snapshot()
 	for _, metadata := range cfg.APIKeys {
 		if metadata.Key == key {
@@ -141,42 +125,44 @@ func (m *APIKeyManager) CleanExpiredKeys() (int, error) {
 		return nil
 	})
 
-	return removed, err
+	if err != nil {
+		return 0, err
+	}
+
+	return removed, nil
 }
 
 func (m *APIKeyManager) GetAllAPIKeysMetadata() []APIKeyMetadata {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	cfg := m.store.Snapshot()
 	return slices.Clone(cfg.APIKeys)
 }
 
 func (m *APIKeyManager) GetValidKeys() []string {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	cfg := m.store.Snapshot()
 	now := time.Now()
 	validKeys := make([]string, 0, len(cfg.APIKeys)+len(cfg.Keys))
+	seen := make(map[string]struct{}, len(cfg.APIKeys)+len(cfg.Keys))
 
 	for _, metadata := range cfg.APIKeys {
 		if metadata.ExpiresAt.After(now) {
-			validKeys = append(validKeys, metadata.Key)
+			if _, exists := seen[metadata.Key]; !exists {
+				seen[metadata.Key] = struct{}{}
+				validKeys = append(validKeys, metadata.Key)
+			}
 		}
 	}
 
 	for _, k := range cfg.Keys {
-		validKeys = append(validKeys, k)
+		if _, exists := seen[k]; !exists {
+			seen[k] = struct{}{}
+			validKeys = append(validKeys, k)
+		}
 	}
 
 	return validKeys
 }
 
 func (m *APIKeyManager) GetValidAPIKeysMetadata() []APIKeyMetadata {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	cfg := m.store.Snapshot()
 	now := time.Now()
 	validMetadata := make([]APIKeyMetadata, 0, len(cfg.APIKeys))
@@ -196,10 +182,10 @@ func generateAPIKeyID(key string) string {
 }
 
 var (
-	ErrInvalidAPIKey   = newConfigError("invalid_api_key", "API key cannot be empty")
-	ErrAPIKeyNotFound  = newConfigError("api_key_not_found", "API key not found")
-	ErrAPIKeyExpired   = newConfigError("api_key_expired", "API key has expired")
-	ErrAPIKeyExpiring  = newConfigError("api_key_expiring", "API key is expiring soon")
+	ErrInvalidAPIKey  = newConfigError("invalid_api_key", "API key cannot be empty")
+	ErrAPIKeyNotFound = newConfigError("api_key_not_found", "API key not found")
+	ErrAPIKeyExpired  = newConfigError("api_key_expired", "API key has expired")
+	ErrAPIKeyExpiring = newConfigError("api_key_expiring", "API key is expiring soon")
 )
 
 type ConfigError struct {
@@ -217,4 +203,11 @@ func (e *ConfigError) Error() string {
 
 func (e *ConfigError) CodeStr() string {
 	return e.Code
+}
+
+func maskAPIKey(key string) string {
+	if len(key) <= 17 {
+		return "****"
+	}
+	return key[:11] + "****" + key[len(key)-4:]
 }

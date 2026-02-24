@@ -7,23 +7,21 @@ import (
 	"time"
 )
 
-type NotificationType string
-
 type Notification struct {
-	ID        string            `json:"id"`
-	Type      NotificationType  `json:"type"`
-	APIKey    string            `json:"apiKey"`
-	Message   string            `json:"message"`
-	ExpiresAt time.Time         `json:"expiresAt"`
-	Timestamp time.Time         `json:"timestamp"`
-	Data      map[string]any    `json:"data,omitempty"`
+	ID        string                  `json:"id"`
+	Type      config.NotificationType `json:"type"`
+	APIKey    string                  `json:"apiKey"`
+	Message   string                  `json:"message"`
+	ExpiresAt time.Time               `json:"expiresAt"`
+	Timestamp time.Time               `json:"timestamp"`
+	Data      map[string]any          `json:"data,omitempty"`
 }
 
 type Notifier struct {
 	mu          sync.RWMutex
-	subscribers  map[chan Notification]struct{}
-	history      []Notification
-	maxHistory   int
+	subscribers map[chan Notification]struct{}
+	history     []Notification
+	maxHistory  int
 }
 
 func NewNotifier(maxHistory ...int) *Notifier {
@@ -66,6 +64,7 @@ func (n *Notifier) notifyExpiring(keys []config.APIKeyMetadata) {
 
 	for _, key := range keys {
 		notification := Notification{
+			ID:        key.ID + ":" + key.ExpiresAt.Format(time.RFC3339Nano) + ":warning",
 			Type:      config.NotificationTypeWarning,
 			APIKey:    maskAPIKey(key.Key),
 			Message:   "API key expiring soon",
@@ -83,7 +82,8 @@ func (n *Notifier) notifyExpired(keys []config.APIKeyMetadata) {
 
 	for _, key := range keys {
 		notification := Notification{
-			Type:      config.NotificationTypeError,
+			ID:        key.ID + ":" + key.ExpiresAt.Format(time.RFC3339Nano) + ":expired",
+			Type:      config.NotificationTypeExpired,
 			APIKey:    maskAPIKey(key.Key),
 			Message:   "API key has expired",
 			ExpiresAt: key.ExpiresAt,
@@ -103,10 +103,15 @@ func (n *Notifier) GetHistory() []Notification {
 }
 
 func (n *Notifier) addToHistory(notification Notification) {
-	n.history = append(n.history, notification)
-	if len(n.history) > n.maxHistory {
-		n.history = n.history[1:]
+	if len(n.history) < n.maxHistory {
+		n.history = append(n.history, notification)
+		return
 	}
+
+	trimmed := make([]Notification, n.maxHistory)
+	copy(trimmed, n.history[1:])
+	trimmed[n.maxHistory-1] = notification
+	n.history = trimmed
 }
 
 func (n *Notifier) broadcast(notification Notification) {
@@ -114,17 +119,14 @@ func (n *Notifier) broadcast(notification Notification) {
 		select {
 		case sub <- notification:
 		default:
-			select {
-			case sub <- notification:
-			case <-time.After(time.Second):
-			}
+			// Drop notifications for slow subscribers to avoid blocking notifier operations.
 		}
 	}
 }
 
 func maskAPIKey(key string) string {
-	if len(key) <= 16 {
+	if len(key) <= 17 {
 		return "****"
 	}
-	return key[:8] + "****" + key[len(key)-4:]
+	return key[:11] + "****" + key[len(key)-4:]
 }

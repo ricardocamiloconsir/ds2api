@@ -1,9 +1,9 @@
 import { Clock, AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import clsx from 'clsx'
 import { calculateDaysUntilExpiry, getKeyExpiryStatusFromMetadata, EXPIRY_THRESHOLDS } from '../../utils/apiKeyUtils'
 
-export default function ApiKeyExpiryPanel({ t, apiKeysMetadata, onRefresh, onCheckNow }) {
+export default function ApiKeyExpiryPanel({ t, apiKeysMetadata = [], onRefresh, onCheckNow }) {
     const [loading, setLoading] = useState(false)
 
     const validKeys = apiKeysMetadata.filter(k => getKeyExpiryStatusFromMetadata(k).status === 'valid')
@@ -27,14 +27,20 @@ export default function ApiKeyExpiryPanel({ t, apiKeysMetadata, onRefresh, onChe
 
     const handleRefresh = async () => {
         setLoading(true)
-        await onRefresh()
-        setLoading(false)
+        try {
+            await onRefresh()
+        } finally {
+            setLoading(false)
+        }
     }
 
     const handleCheckNow = async () => {
         setLoading(true)
-        await onCheckNow()
-        setLoading(false)
+        try {
+            await onCheckNow()
+        } finally {
+            setLoading(false)
+        }
     }
 
     return (
