@@ -22,12 +22,10 @@ func (m *APIKeyManager) AddAPIKey(key string) error {
 		return ErrInvalidAPIKey
 	}
 
-	now := time.Now()
 	metadata := APIKeyMetadata{
 		ID:        generateAPIKeyID(key),
 		Key:       key,
-		CreatedAt: now,
-		ExpiresAt: APIKeyExpiryFrom(now),
+		CreatedAt: time.Now(),
 	}
 
 	return m.store.Update(func(c *Config) error {
@@ -68,11 +66,10 @@ func (m *APIKeyManager) filterKeys(filter KeyFilterFunc) []APIKeyMetadata {
 }
 
 func (m *APIKeyManager) IsAPIKeyValid(key string) bool {
-	now := time.Now()
 	cfg := m.store.Snapshot()
 	for _, metadata := range cfg.APIKeys {
 		if metadata.Key == key {
-			return IsAPIKeyActiveAt(metadata, now)
+			return IsAPIKeyActiveAt(metadata, time.Time{})
 		}
 	}
 
@@ -97,43 +94,22 @@ func (m *APIKeyManager) GetAPIKeyMetadata(key string) (APIKeyMetadata, bool) {
 }
 
 func (m *APIKeyManager) GetExpiringKeys(daysBefore int) []APIKeyMetadata {
-	now := time.Now()
-	threshold := now.Add(time.Duration(daysBefore) * 24 * time.Hour)
+	_ = daysBefore
 	return m.filterKeys(func(k APIKeyMetadata) bool {
-		expiry := ResolveAPIKeyExpiry(k)
-		return expiry.After(now) && expiry.Before(threshold)
+		_ = k
+		return false
 	})
 }
 
 func (m *APIKeyManager) GetExpiredKeys() []APIKeyMetadata {
-	now := time.Now()
 	return m.filterKeys(func(k APIKeyMetadata) bool {
-		expiry := ResolveAPIKeyExpiry(k)
-		return !expiry.IsZero() && expiry.Before(now)
+		_ = k
+		return false
 	})
 }
 
 func (m *APIKeyManager) CleanExpiredKeys() (int, error) {
-	var removed int
-	err := m.store.Update(func(c *Config) error {
-		var valid []APIKeyMetadata
-		now := time.Now()
-		for _, metadata := range c.APIKeys {
-			if IsAPIKeyActiveAt(metadata, now) {
-				valid = append(valid, metadata)
-			} else {
-				removed++
-			}
-		}
-		c.APIKeys = valid
-		return nil
-	})
-
-	if err != nil {
-		return 0, err
-	}
-
-	return removed, nil
+	return 0, nil
 }
 
 func (m *APIKeyManager) GetAllAPIKeysMetadata() []APIKeyMetadata {
@@ -143,12 +119,11 @@ func (m *APIKeyManager) GetAllAPIKeysMetadata() []APIKeyMetadata {
 
 func (m *APIKeyManager) GetValidKeys() []string {
 	cfg := m.store.Snapshot()
-	now := time.Now()
 	validKeys := make([]string, 0, len(cfg.APIKeys)+len(cfg.Keys))
 	seen := make(map[string]struct{}, len(cfg.APIKeys)+len(cfg.Keys))
 
 	for _, metadata := range cfg.APIKeys {
-		if IsAPIKeyActiveAt(metadata, now) {
+		if IsAPIKeyActiveAt(metadata, time.Time{}) {
 			if _, exists := seen[metadata.Key]; !exists {
 				seen[metadata.Key] = struct{}{}
 				validKeys = append(validKeys, metadata.Key)
@@ -168,11 +143,10 @@ func (m *APIKeyManager) GetValidKeys() []string {
 
 func (m *APIKeyManager) GetValidAPIKeysMetadata() []APIKeyMetadata {
 	cfg := m.store.Snapshot()
-	now := time.Now()
 	validMetadata := make([]APIKeyMetadata, 0, len(cfg.APIKeys))
 
 	for _, metadata := range cfg.APIKeys {
-		if IsAPIKeyActiveAt(metadata, now) {
+		if IsAPIKeyActiveAt(metadata, time.Time{}) {
 			validMetadata = append(validMetadata, metadata)
 		}
 	}
