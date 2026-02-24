@@ -25,7 +25,6 @@ const (
 const (
 	SSEContentType         = "text/event-stream"
 	SSECacheControl        = "no-cache"
-	SSEConnection          = "keep-alive"
-	SSEAccessControlOrigin = "*"
-	SSETimeoutDefault      = 2 * time.Hour
+	SSEConnection     = "keep-alive"
+	SSETimeoutDefault = 2 * time.Hour
 )

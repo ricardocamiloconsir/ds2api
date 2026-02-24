@@ -12,12 +12,13 @@ import (
 )
 
 type Store struct {
-	mu      sync.RWMutex
-	cfg     Config
-	path    string
-	fromEnv bool
-	keyMap  map[string]struct{} // O(1) API key lookup index
-	accMap  map[string]int      // O(1) account lookup: identifier -> slice index
+	mu         sync.RWMutex
+	cfg        Config
+	path       string
+	fromEnv    bool
+	keyMap     map[string]struct{}       // O(1) legacy API key lookup index
+	keyMetaMap map[string]APIKeyMetadata // O(1) API key metadata lookup
+	accMap     map[string]int            // O(1) account lookup: identifier -> slice index
 }
 
 func NewStore(cfg *Config, path string) *Store {
@@ -55,11 +56,13 @@ func LoadStore() *Store {
 		} else {
 			Logger.Info("[config] config backed up", "path", backupPath)
 
+			originalCfg := cfg.Clone()
 			if MigrateAPIKeysToV2(&cfg) {
 				if err := SaveConfigToPath(&cfg, tempPath); err != nil {
 					Logger.Error("[config] failed to write migrated config to temp file", "error", err)
 					Logger.Warn("[config] cleaning up temp file and aborting migration")
 					os.Remove(tempPath)
+					cfg = originalCfg
 				} else {
 					if err := os.Rename(tempPath, ConfigPath()); err != nil {
 						Logger.Error("[config] failed to rename temp file to config", "error", err)
@@ -68,6 +71,7 @@ func LoadStore() *Store {
 							Logger.Error("[config] failed to restore config from backup", "error", restoreErr)
 						}
 						os.Remove(tempPath)
+						cfg = originalCfg
 					} else {
 						Logger.Info("[config] migration completed successfully")
 					}
@@ -117,19 +121,15 @@ func (s *Store) Snapshot() Config {
 	return s.cfg.Clone()
 }
 
-func (s *Store) findAPIKeyMetadataLocked(k string, cfg *Config) (APIKeyMetadata, bool) {
-	for _, metadata := range cfg.APIKeys {
-		if metadata.Key == k {
-			return metadata, true
-		}
-	}
-	return APIKeyMetadata{}, false
+func (s *Store) findAPIKeyMetadataLocked(k string) (APIKeyMetadata, bool) {
+	metadata, ok := s.keyMetaMap[k]
+	return metadata, ok
 }
 
 func (s *Store) HasAPIKey(k string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if _, found := s.findAPIKeyMetadataLocked(k, &s.cfg); found {
+	if _, found := s.findAPIKeyMetadataLocked(k); found {
 		return true
 	}
 	_, ok := s.keyMap[k]
@@ -139,7 +139,7 @@ func (s *Store) HasAPIKey(k string) bool {
 func (s *Store) HasValidAPIKey(k string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if metadata, found := s.findAPIKeyMetadataLocked(k, &s.cfg); found {
+	if metadata, found := s.findAPIKeyMetadataLocked(k); found {
 		return time.Now().Before(metadata.ExpiresAt)
 	}
 	_, ok := s.keyMap[k]
@@ -149,7 +149,7 @@ func (s *Store) HasValidAPIKey(k string) bool {
 func (s *Store) IsAPIKeyExpired(k string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if metadata, found := s.findAPIKeyMetadataLocked(k, &s.cfg); found {
+	if metadata, found := s.findAPIKeyMetadataLocked(k); found {
 		return time.Now().After(metadata.ExpiresAt)
 	}
 	return false

@@ -64,9 +64,14 @@ func RegisterRoutes(r chi.Router, h *Handler) {
 }
 
 func (h *Handler) writeJSONResponse(w http.ResponseWriter, payload any) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		config.Logger.Error("[admin] failed to marshal JSON response", "error", err)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	if _, err := w.Write(data); err != nil {
+		config.Logger.Error("[admin] failed to write JSON response", "error", err)
 	}
 }
 
@@ -148,7 +153,6 @@ func (h *Handler) streamNotifications(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", config.SSEContentType)
 	w.Header().Set("Cache-Control", config.SSECacheControl)
 	w.Header().Set("Connection", config.SSEConnection)
-	w.Header().Set("Access-Control-Allow-Origin", config.SSEAccessControlOrigin)
 
 	sub := h.Notifier.Subscribe(ctx)
 	defer config.Logger.Debug("[sse] stream notification handler closed")
@@ -203,6 +207,10 @@ func (h *Handler) updateMonitorSettings(w http.ResponseWriter, r *http.Request) 
 		interval, err := time.ParseDuration(req.CheckInterval)
 		if err != nil {
 			http.Error(w, "Invalid check_interval format", http.StatusBadRequest)
+			return
+		}
+		if interval <= 0 {
+			http.Error(w, "check_interval must be a positive duration", http.StatusBadRequest)
 			return
 		}
 		h.Monitor.SetCheckInterval(interval)

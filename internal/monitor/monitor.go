@@ -16,6 +16,7 @@ type Monitor struct {
 	warningDays   int
 	cancel        context.CancelFunc
 	running       bool
+	resetTickerCh chan struct{}
 	mu            sync.Mutex
 }
 
@@ -26,13 +27,19 @@ func NewMonitor(store *config.Store, apiKeyManager *config.APIKeyManager, notifi
 		notifier:      notifier,
 		checkInterval: config.DefaultCheckInterval,
 		warningDays:   config.DefaultWarningDays,
+		resetTickerCh: make(chan struct{}, 1),
 	}
 }
 
 func (m *Monitor) SetCheckInterval(interval time.Duration) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.checkInterval = interval
+	m.mu.Unlock()
+
+	select {
+	case m.resetTickerCh <- struct{}{}:
+	default:
+	}
 }
 
 func (m *Monitor) SetWarningDays(days int) {
@@ -67,6 +74,11 @@ func (m *Monitor) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			m.checkExpirations()
+		case <-m.resetTickerCh:
+			m.mu.Lock()
+			updatedInterval := m.checkInterval
+			m.mu.Unlock()
+			ticker.Reset(updatedInterval)
 		}
 	}
 }

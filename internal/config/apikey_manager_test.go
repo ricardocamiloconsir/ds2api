@@ -250,7 +250,7 @@ func TestMaskAPIKey(t *testing.T) {
 			expected: "****",
 		},
 		{
-			name:     "exactly 16 chars",
+			name:     "exactly 17 chars",
 			key:      "sk-12345678901234",
 			expected: "****",
 		},
