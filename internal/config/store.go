@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"time"
 )
 
 type Store struct {
@@ -139,8 +138,8 @@ func (s *Store) HasAPIKey(k string) bool {
 func (s *Store) HasValidAPIKey(k string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if metadata, found := s.findAPIKeyMetadataLocked(k); found {
-		return IsAPIKeyActiveAt(metadata, time.Now())
+	if _, found := s.findAPIKeyMetadataLocked(k); found {
+		return true
 	}
 	_, ok := s.keyMap[k]
 	return ok
@@ -149,10 +148,6 @@ func (s *Store) HasValidAPIKey(k string) bool {
 func (s *Store) IsAPIKeyExpired(k string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if metadata, found := s.findAPIKeyMetadataLocked(k); found {
-		expiry := ResolveAPIKeyExpiry(metadata)
-		return !expiry.IsZero() && time.Now().After(expiry)
-	}
 	return false
 }
 

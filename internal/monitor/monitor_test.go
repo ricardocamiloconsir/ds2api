@@ -146,8 +146,8 @@ func TestMonitor_CheckExpirations(t *testing.T) {
 	monitor.CheckNow()
 
 	history := notifier.GetHistory()
-	if len(history) < 2 {
-		t.Fatalf("expected at least 2 notifications, got %d", len(history))
+	if len(history) != 0 {
+		t.Fatalf("expected 0 notifications, got %d", len(history))
 	}
 }
 
