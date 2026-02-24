@@ -79,17 +79,33 @@ export default function AccountsTable({
                 ) : accounts.length > 0 ? (
                     accounts.map((acc, i) => {
                         const id = resolveAccountIdentifier(acc)
+                        const isActiveSession = Boolean(acc.has_token)
                         return (
-                            <div key={i} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-muted/50 transition-colors">
+                            <div
+                                key={i}
+                                className={clsx(
+                                    'p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors',
+                                    isActiveSession
+                                        ? 'bg-emerald-500/5 border-l-2 border-l-emerald-500 hover:bg-emerald-500/10'
+                                        : 'hover:bg-muted/50'
+                                )}
+                            >
                                 <div className="flex items-center gap-3 min-w-0">
                                     <div className={clsx(
                                         "w-2 h-2 rounded-full shrink-0",
-                                        acc.has_token ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-amber-500"
+                                        isActiveSession ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-amber-500"
                                     )} />
                                     <div className="min-w-0">
-                                        <div className="font-medium truncate">{id || '-'}</div>
+                                        <div className="font-medium truncate flex items-center gap-2">
+                                            <span className="truncate">{id || '-'}</span>
+                                            {isActiveSession && (
+                                                <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                                                    {t('accountManager.sessionActive')}
+                                                </span>
+                                            )}
+                                        </div>
                                         <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                                            <span>{acc.has_token ? t('accountManager.sessionActive') : t('accountManager.reauthRequired')}</span>
+                                            <span>{isActiveSession ? t('accountManager.sessionActive') : t('accountManager.reauthRequired')}</span>
                                             {acc.token_preview && (
                                                 <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px]">
                                                     {acc.token_preview}
