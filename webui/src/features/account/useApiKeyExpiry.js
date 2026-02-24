@@ -96,33 +96,74 @@ export function useApiKeyExpiry({ apiFetch, t }) {
     }, [fetchApiKeysMetadata, fetchNotifications, fetchMonitorStatus])
 
     useEffect(() => {
-        let eventSource
         let retryTimeout
         let retryCount = 0
         let cancelled = false
+        let abortController = null
         const maxRetries = 5
 
-        const connectStream = () => {
-            if (cancelled) return
+        const processSSEBuffer = (buffer, onMessage) => {
+            const events = buffer.split('\n\n')
+            const incomplete = events.pop() ?? ''
 
-            eventSource = new EventSource('/admin/notifications/stream')
+            for (const eventChunk of events) {
+                const lines = eventChunk.split('\n')
+                const payload = lines
+                    .filter(line => line.startsWith('data:'))
+                    .map(line => line.slice(5).trimStart())
+                    .join('\n')
 
-            eventSource.onmessage = (event) => {
-                try {
-                    const notification = normalizeNotification(JSON.parse(event.data))
-                    setNotifications(prev => [notification, ...prev])
-                } catch (e) {
-                    console.error('Failed to parse notification:', e)
+                if (payload) {
+                    onMessage(payload)
                 }
             }
 
-            eventSource.onerror = () => {
-                if (eventSource) {
-                    eventSource.close()
-                }
-                if (cancelled) return
+            return incomplete
+        }
 
-                console.warn('SSE connection error, attempting to reconnect...')
+        const connectStream = async () => {
+            if (cancelled) return
+
+            abortController = new AbortController()
+
+            try {
+                // Use authenticated fetch for SSE because EventSource cannot send Authorization headers.
+                const res = await apiFetch('/admin/notifications/stream', {
+                    signal: abortController.signal,
+                    headers: { Accept: 'text/event-stream' },
+                })
+
+                if (!res.ok || !res.body) {
+                    throw new Error(`SSE stream failed with status ${res.status}`)
+                }
+
+                retryCount = 0
+                console.log('SSE connection established')
+
+                const reader = res.body.getReader()
+                const decoder = new TextDecoder()
+                let buffer = ''
+
+                while (!cancelled) {
+                    const { value, done } = await reader.read()
+                    if (done) {
+                        break
+                    }
+
+                    buffer += decoder.decode(value, { stream: true })
+                    buffer = processSSEBuffer(buffer, (payload) => {
+                        try {
+                            const notification = normalizeNotification(JSON.parse(payload))
+                            setNotifications(prev => [notification, ...prev])
+                        } catch (e) {
+                            console.error('Failed to parse notification:', e)
+                        }
+                    })
+                }
+            } catch (e) {
+                if (cancelled || e.name === 'AbortError') return
+
+                console.warn('SSE connection error, attempting to reconnect...', e)
                 retryCount++
                 if (retryCount <= maxRetries) {
                     retryTimeout = setTimeout(() => {
@@ -132,25 +173,20 @@ export function useApiKeyExpiry({ apiFetch, t }) {
                     }, 5000 * retryCount)
                 }
             }
-
-            eventSource.onopen = () => {
-                retryCount = 0
-                console.log('SSE connection established')
-            }
         }
 
         connectStream()
 
         return () => {
             cancelled = true
-            if (eventSource) {
-                eventSource.close()
+            if (abortController) {
+                abortController.abort()
             }
             if (retryTimeout) {
                 clearTimeout(retryTimeout)
             }
         }
-    }, [])
+    }, [apiFetch])
 
     const refresh = useCallback(async () => {
         setLoading(true)

@@ -6,6 +6,10 @@ func (s *Store) rebuildIndexes() {
 	for _, k := range s.cfg.Keys {
 		s.keyMap[k] = struct{}{}
 	}
+	s.keyMetaMap = make(map[string]APIKeyMetadata, len(s.cfg.APIKeys))
+	for _, metadata := range s.cfg.APIKeys {
+		s.keyMetaMap[metadata.Key] = metadata
+	}
 	s.accMap = make(map[string]int, len(s.cfg.Accounts))
 	for i, acc := range s.cfg.Accounts {
 		id := acc.Identifier()

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	stderrors "errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 )
 
@@ -35,12 +35,12 @@ func NewAppError(code, message string, err error) *AppError {
 
 var (
 	ErrUnauthorized        = NewAppError("UNAUTHORIZED", "unauthorized: missing auth token", nil)
-	ErrAccountNotFound     = NewAppError("ACCOUNT_NOT_FOUND", "账号不存在", nil)
+	ErrAccountNotFound     = NewAppError("ACCOUNT_NOT_FOUND", "account not found", nil)
 	ErrAPIKeyNotFound      = NewAppError("API_KEY_NOT_FOUND", "API key not found", nil)
-	ErrInvalidRequest      = NewAppError("INVALID_REQUEST", "需要 email 或 mobile", nil)
+	ErrInvalidRequest      = NewAppError("INVALID_REQUEST", "email or mobile required", nil)
 	ErrServiceNotAvailable = NewAppError("SERVICE_UNAVAILABLE", "service not available", nil)
-	ErrAccountExists       = NewAppError("ACCOUNT_EXISTS", "邮箱已存在", nil)
-	ErrMobileExists        = NewAppError("MOBILE_EXISTS", "手机号已存在", nil)
+	ErrAccountExists       = NewAppError("ACCOUNT_EXISTS", "email already exists", nil)
+	ErrMobileExists        = NewAppError("MOBILE_EXISTS", "mobile already exists", nil)
 )
 
 func WriteErrorResponse(w http.ResponseWriter, err error) {
@@ -53,14 +53,14 @@ func WriteErrorResponse(w http.ResponseWriter, err error) {
 			status = statusCodeForError(appErr.Code)
 			detail = appErr.Message
 		} else {
-			log.Printf("[errors] internal error: %v", err)
+			slog.Error("[errors] internal error", "error", err)
 		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if encodeErr := json.NewEncoder(w).Encode(map[string]string{"detail": detail}); encodeErr != nil {
-		log.Printf("[errors] failed to encode error response: %v", encodeErr)
+		slog.Error("[errors] failed to encode error response", "error", encodeErr)
 	}
 }
 
@@ -72,6 +72,10 @@ func statusCodeForError(code string) int {
 		return http.StatusNotFound
 	case "INVALID_REQUEST":
 		return http.StatusBadRequest
+	case "API_KEY_EXPIRED":
+		return http.StatusUnauthorized
+	case "API_KEY_EXPIRING":
+		return http.StatusConflict
 	case "SERVICE_UNAVAILABLE":
 		return http.StatusServiceUnavailable
 	case "ACCOUNT_EXISTS", "MOBILE_EXISTS":

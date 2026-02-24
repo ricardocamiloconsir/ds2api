@@ -18,7 +18,18 @@ func TestNotifier_Subscribe(t *testing.T) {
 	assert.NotNil(t, sub)
 
 	cancel()
-	time.Sleep(10 * time.Millisecond)
+
+	deadline := time.After(200 * time.Millisecond)
+	for {
+		select {
+		case _, ok := <-sub:
+			if !ok {
+				return
+			}
+		case <-deadline:
+			t.Fatal("subscriber channel was not closed after cancel")
+		}
+	}
 }
 
 func TestNotifier_NotifyExpiring(t *testing.T) {

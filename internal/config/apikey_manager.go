@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"slices"
 	"time"
+
+	apierrors "ds2api/internal/errors"
 )
 
 type APIKeyManager struct {
@@ -178,32 +180,15 @@ func (m *APIKeyManager) GetValidAPIKeysMetadata() []APIKeyMetadata {
 
 func generateAPIKeyID(key string) string {
 	sum := sha256.Sum256([]byte(key))
-	return "apikey:" + hex.EncodeToString(sum[:8])
+	return "apikey:" + hex.EncodeToString(sum[:16])
 }
 
 var (
-	ErrInvalidAPIKey  = newConfigError("invalid_api_key", "API key cannot be empty")
-	ErrAPIKeyNotFound = newConfigError("api_key_not_found", "API key not found")
-	ErrAPIKeyExpired  = newConfigError("api_key_expired", "API key has expired")
-	ErrAPIKeyExpiring = newConfigError("api_key_expiring", "API key is expiring soon")
+	ErrInvalidAPIKey  = apierrors.NewAppError("INVALID_REQUEST", "API key cannot be empty", nil)
+	ErrAPIKeyNotFound = apierrors.NewAppError("API_KEY_NOT_FOUND", "API key not found", nil)
+	ErrAPIKeyExpired  = apierrors.NewAppError("API_KEY_EXPIRED", "API key has expired", nil)
+	ErrAPIKeyExpiring = apierrors.NewAppError("API_KEY_EXPIRING", "API key is expiring soon", nil)
 )
-
-type ConfigError struct {
-	Code    string
-	Message string
-}
-
-func newConfigError(code, message string) *ConfigError {
-	return &ConfigError{Code: code, Message: message}
-}
-
-func (e *ConfigError) Error() string {
-	return e.Message
-}
-
-func (e *ConfigError) CodeStr() string {
-	return e.Code
-}
 
 func maskAPIKey(key string) string {
 	if len(key) <= 17 {

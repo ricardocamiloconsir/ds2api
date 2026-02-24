@@ -2,15 +2,17 @@ package config
 
 import (
 	"os"
+	"strings"
 	"time"
 )
 
 func MigrateAPIKeysToV2(cfg *Config) bool {
-	if len(cfg.APIKeys) > 0 {
+	if len(cfg.Keys) == 0 {
 		return false
 	}
 
-	if len(cfg.Keys) == 0 {
+	// Idempotent migration: allow reruns to fill missing APIKeys after partial migration.
+	if len(cfg.APIKeys) >= len(cfg.Keys) {
 		return false
 	}
 
@@ -18,8 +20,19 @@ func MigrateAPIKeysToV2(cfg *Config) bool {
 
 	now := time.Now()
 	apiKeys := make([]APIKeyMetadata, 0, len(cfg.Keys))
+	existing := make(map[string]struct{}, len(cfg.APIKeys))
+	for _, metadata := range cfg.APIKeys {
+		existing[metadata.Key] = struct{}{}
+		apiKeys = append(apiKeys, metadata)
+	}
 
 	for _, key := range cfg.Keys {
+		if strings.TrimSpace(key) == "" {
+			continue
+		}
+		if _, ok := existing[key]; ok {
+			continue
+		}
 		metadata := APIKeyMetadata{
 			ID:        generateAPIKeyID(key),
 			Key:       key,
@@ -27,6 +40,7 @@ func MigrateAPIKeysToV2(cfg *Config) bool {
 			ExpiresAt: now.Add(APIKeyTTL),
 		}
 		apiKeys = append(apiKeys, metadata)
+		existing[key] = struct{}{}
 	}
 
 	cfg.APIKeys = apiKeys
@@ -49,7 +63,11 @@ func BackupConfig(filePath string) (string, error) {
 	}
 
 	backupPath := filePath + ".backup." + time.Now().Format("20060102-150405")
-	return backupPath, os.WriteFile(backupPath, data, fileInfo.Mode().Perm())
+	safePerm := fileInfo.Mode().Perm() & 0o600
+	if safePerm == 0 {
+		safePerm = 0o600
+	}
+	return backupPath, os.WriteFile(backupPath, data, safePerm)
 }
 
 func RestoreConfig(backupPath, targetPath string) error {
@@ -63,5 +81,10 @@ func RestoreConfig(backupPath, targetPath string) error {
 		return err
 	}
 
-	return os.WriteFile(targetPath, data, backupInfo.Mode().Perm())
+	safePerm := backupInfo.Mode().Perm() & 0o600
+	if safePerm == 0 {
+		safePerm = 0o600
+	}
+
+	return os.WriteFile(targetPath, data, safePerm)
 }
