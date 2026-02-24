@@ -76,6 +76,9 @@ func (m *APIKeyManager) filterKeys(filter KeyFilterFunc) []APIKeyMetadata {
 }
 
 func (m *APIKeyManager) IsAPIKeyValid(key string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	now := time.Now()
 	cfg := m.store.Snapshot()
 	for _, metadata := range cfg.APIKeys {
