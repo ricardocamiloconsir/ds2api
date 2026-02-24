@@ -1,6 +1,6 @@
 import { X } from 'lucide-react'
 
-export default function AddKeyModal({ show, t, newKey, setNewKey, loading, onClose, onAdd }) {
+export default function AddKeyModal({ show, t, newKey, setNewKey, loading, errorMessage, onClose, onAdd }) {
     if (!show) {
         return null
     }
@@ -10,7 +10,7 @@ export default function AddKeyModal({ show, t, newKey, setNewKey, loading, onClo
             <div className="bg-card w-full max-w-md rounded-xl border border-border shadow-2xl overflow-hidden animate-in zoom-in-95">
                 <div className="p-4 border-b border-border flex justify-between items-center">
                     <h3 className="font-semibold">{t('accountManager.modalAddKeyTitle')}</h3>
-                    <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+                    <button onClick={onClose} disabled={loading} className="text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -36,8 +36,13 @@ export default function AddKeyModal({ show, t, newKey, setNewKey, loading, onClo
                         </div>
                         <p className="text-xs text-muted-foreground mt-1.5">{t('accountManager.generateHint')}</p>
                     </div>
+                    {errorMessage && (
+                        <div className="rounded-lg border border-destructive/40 bg-destructive/10 text-destructive text-sm px-3 py-2">
+                            {errorMessage}
+                        </div>
+                    )}
                     <div className="flex justify-end gap-2 pt-2">
-                        <button onClick={onClose} className="px-4 py-2 rounded-lg border border-border hover:bg-secondary transition-colors text-sm font-medium">{t('actions.cancel')}</button>
+                        <button onClick={onClose} disabled={loading} className="px-4 py-2 rounded-lg border border-border hover:bg-secondary transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">{t('actions.cancel')}</button>
                         <button onClick={onAdd} disabled={loading} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50">
                             {loading ? t('accountManager.addKeyLoading') : t('accountManager.addKeyAction')}
                         </button>

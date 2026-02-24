@@ -20,6 +20,13 @@ func TestAddKeyWithManagerPersistsAndListedInConfig(t *testing.T) {
 	if addRec.Code != http.StatusOK {
 		t.Fatalf("unexpected add status: %d body=%s", addRec.Code, addRec.Body.String())
 	}
+	var addPayload map[string]any
+	if err := json.Unmarshal(addRec.Body.Bytes(), &addPayload); err != nil {
+		t.Fatalf("decode add response failed: %v", err)
+	}
+	if ok, _ := addPayload["persisted"].(bool); !ok {
+		t.Fatalf("expected persisted=true in add response: %#v", addPayload)
+	}
 
 	cfgReq := httptest.NewRequest(http.MethodGet, "/admin/config", nil)
 	cfgRec := httptest.NewRecorder()

@@ -85,12 +85,17 @@ func (h *Handler) addKey(w http.ResponseWriter, r *http.Request) {
 	if h.APIKeyManager != nil {
 		if err := h.APIKeyManager.AddAPIKey(key); err != nil {
 			config.Logger.Error("[admin][keys] failed to persist key via manager", "key", masked, "error", err)
-			writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
+			writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error(), "success": false, "persisted": false})
 			return
 		}
+		persisted := h.APIKeyManager.IsAPIKeyValid(key)
 		totalKeys := len(h.APIKeyManager.GetValidKeys())
-		config.Logger.Info("[admin][keys] key persisted via manager", "key", masked, "total_keys", totalKeys)
-		writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_keys": totalKeys})
+		config.Logger.Info("[admin][keys] key persisted via manager", "key", masked, "total_keys", totalKeys, "persisted", persisted)
+		if !persisted {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"detail": "key persistence validation failed", "success": false, "persisted": false})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"success": true, "persisted": true, "total_keys": totalKeys})
 		return
 	}
 
@@ -105,12 +110,24 @@ func (h *Handler) addKey(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		config.Logger.Error("[admin][keys] failed to persist key via store", "key", masked, "error", err)
-		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error(), "success": false, "persisted": false})
 		return
 	}
-	totalKeys := len(h.Store.Snapshot().Keys)
-	config.Logger.Info("[admin][keys] key persisted via store", "key", masked, "total_keys", totalKeys)
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_keys": totalKeys})
+	snapshot := h.Store.Snapshot()
+	persisted := false
+	for _, existingKey := range snapshot.Keys {
+		if existingKey == key {
+			persisted = true
+			break
+		}
+	}
+	totalKeys := len(snapshot.Keys)
+	config.Logger.Info("[admin][keys] key persisted via store", "key", masked, "total_keys", totalKeys, "persisted", persisted)
+	if !persisted {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"detail": "key persistence validation failed", "success": false, "persisted": false})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "persisted": true, "total_keys": totalKeys})
 }
 
 func (h *Handler) deleteKey(w http.ResponseWriter, r *http.Request) {

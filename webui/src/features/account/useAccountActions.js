@@ -9,6 +9,7 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
     const [newAccount, setNewAccount] = useState({ email: '', mobile: '', password: '' })
     const [editingAccount, setEditingAccount] = useState({ email: '', mobile: '', password: '', identifier: '' })
     const [loading, setLoading] = useState(false)
+    const [addKeyError, setAddKeyError] = useState('')
     const [testing, setTesting] = useState({})
     const [testingAll, setTestingAll] = useState(false)
     const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, results: [] })
@@ -23,8 +24,11 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
     }
 
     const addKey = async () => {
+        setAddKeyError('')
         if (!newKey.trim()) {
-            onMessage('error', t('accountManager.requiredFields'))
+            const message = t('accountManager.keyRequired')
+            setAddKeyError(message)
+            onMessage('error', message)
             return
         }
         const normalizedKey = newKey.trim()
@@ -37,21 +41,40 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
                 body: JSON.stringify({ key: normalizedKey }),
             })
             if (res.ok) {
+                const addPayload = await res.json().catch(() => ({}))
+                console.info('[api-key] persistence response:', addPayload)
+                if (addPayload?.success !== true || addPayload?.persisted !== true) {
+                    throw new Error(t('accountManager.keyPersistValidationFailed'))
+                }
+
                 const latestKeys = await fetchLatestKeys()
                 if (!latestKeys.includes(normalizedKey)) {
-                    throw new Error(t('batchImport.fetchConfigFailed'))
+                    throw new Error(t('accountManager.keyPersistValidationFailed'))
                 }
+
+                // Real-time update + automatic refresh to prevent stale list after modal close.
                 await onRefresh()
+                setTimeout(() => {
+                    onRefresh().catch((refreshError) => {
+                        console.error('[api-key] deferred refresh failed:', refreshError)
+                    })
+                }, 350)
+
                 onMessage('success', t('accountManager.addKeySuccess'))
                 setNewKey('')
                 setShowAddKey(false)
                 console.info('[api-key] key created and list refreshed successfully')
             } else {
-                const data = await res.json()
-                onMessage('error', data.detail || t('messages.failedToAdd'))
+                const data = await res.json().catch(() => ({}))
+                const errorMessage = data.detail || t('messages.failedToAdd')
+                setAddKeyError(errorMessage)
+                onMessage('error', errorMessage)
             }
         } catch (e) {
-            onMessage('error', e.message || t('messages.networkError'))
+            const fallbackMessage = t('messages.networkError')
+            const errorMessage = e.message || fallbackMessage
+            setAddKeyError(errorMessage)
+            onMessage('error', errorMessage)
             console.error('[api-key] failed to create key:', e)
         } finally {
             setLoading(false)
@@ -251,6 +274,8 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
         editingAccount,
         setEditingAccount,
         loading,
+        addKeyError,
+        setAddKeyError,
         testing,
         testingAll,
         batchProgress,
