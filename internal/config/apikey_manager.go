@@ -27,7 +27,7 @@ func (m *APIKeyManager) AddAPIKey(key string) error {
 		ID:        generateAPIKeyID(key),
 		Key:       key,
 		CreatedAt: now,
-		ExpiresAt: now.Add(APIKeyTTL),
+		ExpiresAt: APIKeyExpiryFrom(now),
 	}
 
 	return m.store.Update(func(c *Config) error {
@@ -72,7 +72,7 @@ func (m *APIKeyManager) IsAPIKeyValid(key string) bool {
 	cfg := m.store.Snapshot()
 	for _, metadata := range cfg.APIKeys {
 		if metadata.Key == key {
-			return now.Before(metadata.ExpiresAt)
+			return IsAPIKeyActiveAt(metadata, now)
 		}
 	}
 
@@ -100,14 +100,16 @@ func (m *APIKeyManager) GetExpiringKeys(daysBefore int) []APIKeyMetadata {
 	now := time.Now()
 	threshold := now.Add(time.Duration(daysBefore) * 24 * time.Hour)
 	return m.filterKeys(func(k APIKeyMetadata) bool {
-		return k.ExpiresAt.After(now) && k.ExpiresAt.Before(threshold)
+		expiry := ResolveAPIKeyExpiry(k)
+		return expiry.After(now) && expiry.Before(threshold)
 	})
 }
 
 func (m *APIKeyManager) GetExpiredKeys() []APIKeyMetadata {
 	now := time.Now()
 	return m.filterKeys(func(k APIKeyMetadata) bool {
-		return k.ExpiresAt.Before(now)
+		expiry := ResolveAPIKeyExpiry(k)
+		return !expiry.IsZero() && expiry.Before(now)
 	})
 }
 
@@ -117,7 +119,7 @@ func (m *APIKeyManager) CleanExpiredKeys() (int, error) {
 		var valid []APIKeyMetadata
 		now := time.Now()
 		for _, metadata := range c.APIKeys {
-			if metadata.ExpiresAt.After(now) {
+			if IsAPIKeyActiveAt(metadata, now) {
 				valid = append(valid, metadata)
 			} else {
 				removed++
@@ -146,7 +148,7 @@ func (m *APIKeyManager) GetValidKeys() []string {
 	seen := make(map[string]struct{}, len(cfg.APIKeys)+len(cfg.Keys))
 
 	for _, metadata := range cfg.APIKeys {
-		if metadata.ExpiresAt.After(now) {
+		if IsAPIKeyActiveAt(metadata, now) {
 			if _, exists := seen[metadata.Key]; !exists {
 				seen[metadata.Key] = struct{}{}
 				validKeys = append(validKeys, metadata.Key)
@@ -170,7 +172,7 @@ func (m *APIKeyManager) GetValidAPIKeysMetadata() []APIKeyMetadata {
 	validMetadata := make([]APIKeyMetadata, 0, len(cfg.APIKeys))
 
 	for _, metadata := range cfg.APIKeys {
-		if metadata.ExpiresAt.After(now) {
+		if IsAPIKeyActiveAt(metadata, now) {
 			validMetadata = append(validMetadata, metadata)
 		}
 	}
