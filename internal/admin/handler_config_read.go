@@ -11,6 +11,25 @@ func (h *Handler) getConfig(w http.ResponseWriter, _ *http.Request) {
 	keys := slices.Clone(snap.Keys)
 	if h.APIKeyManager != nil {
 		keys = h.APIKeyManager.GetValidKeys()
+	} else if len(snap.APIKeys) > 0 {
+		seen := make(map[string]struct{}, len(snap.Keys)+len(snap.APIKeys))
+		keys = make([]string, 0, len(snap.Keys)+len(snap.APIKeys))
+
+		for _, key := range snap.Keys {
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			keys = append(keys, key)
+		}
+
+		for _, metadata := range snap.APIKeys {
+			if _, exists := seen[metadata.Key]; exists {
+				continue
+			}
+			seen[metadata.Key] = struct{}{}
+			keys = append(keys, metadata.Key)
+		}
 	}
 	safe := map[string]any{
 		"keys":     keys,
