@@ -90,6 +90,11 @@ func (h *Handler) addKey(w http.ResponseWriter, r *http.Request) {
 		}
 		persisted := h.APIKeyManager.IsAPIKeyValid(key)
 		totalKeys := len(h.APIKeyManager.GetValidKeys())
+		if err := h.ensureEnvBackedConfigPersistence(r.Context()); err != nil {
+			config.Logger.Error("[admin][keys] env-backed persistence failed", "key", masked, "error", err)
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"detail": err.Error(), "success": false, "persisted": false})
+			return
+		}
 		config.Logger.Info("[admin][keys] key persisted via manager", "key", masked, "total_keys", totalKeys, "persisted", persisted)
 		if !persisted {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"detail": "key persistence validation failed", "success": false, "persisted": false})
@@ -122,6 +127,11 @@ func (h *Handler) addKey(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	totalKeys := len(snapshot.Keys)
+	if err := h.ensureEnvBackedConfigPersistence(r.Context()); err != nil {
+		config.Logger.Error("[admin][keys] env-backed persistence failed", "key", masked, "error", err)
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"detail": err.Error(), "success": false, "persisted": false})
+		return
+	}
 	config.Logger.Info("[admin][keys] key persisted via store", "key", masked, "total_keys", totalKeys, "persisted", persisted)
 	if !persisted {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"detail": "key persistence validation failed", "success": false, "persisted": false})
@@ -136,6 +146,10 @@ func (h *Handler) deleteKey(w http.ResponseWriter, r *http.Request) {
 	if h.APIKeyManager != nil {
 		if err := h.APIKeyManager.RemoveAPIKey(key); err != nil {
 			writeJSON(w, http.StatusNotFound, map[string]any{"detail": err.Error()})
+			return
+		}
+		if err := h.ensureEnvBackedConfigPersistence(r.Context()); err != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"detail": err.Error()})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_keys": len(h.APIKeyManager.GetValidKeys())})
@@ -158,6 +172,10 @@ func (h *Handler) deleteKey(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]any{"detail": err.Error()})
+		return
+	}
+	if err := h.ensureEnvBackedConfigPersistence(r.Context()); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"detail": err.Error()})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_keys": len(h.Store.Snapshot().Keys)})
@@ -210,6 +228,10 @@ func (h *Handler) batchImport(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"detail": err.Error()})
+		return
+	}
+	if err := h.ensureEnvBackedConfigPersistence(r.Context()); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"detail": err.Error()})
 		return
 	}
 	h.Pool.Reset()
