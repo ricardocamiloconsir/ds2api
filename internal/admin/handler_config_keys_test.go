@@ -56,3 +56,26 @@ func TestAddKeyRejectsInvalidJSON(t *testing.T) {
 		t.Fatalf("unexpected status: %d body=%s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestGetConfigIncludesStoredAPIKeysWithoutManager(t *testing.T) {
+	h := newAdminTestHandler(t, `{"keys":["legacy-k1"],"api_keys":[{"id":"apikey:1","key":"sk-meta-001","created_at":"2026-01-01T00:00:00Z"}]}`)
+	h.APIKeyManager = nil
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/config", nil)
+	rec := httptest.NewRecorder()
+	h.getConfig(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected config status: %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response failed: %v", err)
+	}
+
+	keys, _ := payload["keys"].([]any)
+	if len(keys) != 2 || keys[0] != "legacy-k1" || keys[1] != "sk-meta-001" {
+		t.Fatalf("unexpected keys list: %#v", keys)
+	}
+}
